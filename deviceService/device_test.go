@@ -1,7 +1,7 @@
 package deviceService_test
 
 import (
-	"github.com/UniversalRobotDriveTeam/child-nodes-basic/robotBasicAPI/deviceService"
+	"github.com/UniversalRobotDriveTeam/child-nodes-device-service/deviceService"
 	"testing"
 	"time"
 )

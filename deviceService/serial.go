@@ -40,14 +40,14 @@ func (app *SerialApp) send(targetModuleID byte, targetFunction string, data *[]b
 	defer app.mu.Unlock()
 	devices, ok := app.serialDevicesBySubModuleID[targetModuleID]
 	if !ok {
-		return util.NewError(_const.TrivialException, _const.DeviceNoTargetModuleError, false, nil)
+		return util.NewError(_const.TrivialException, _const.DeviceNoTargetModuleError, nil)
 	}
 	// 没有对应模块 则直接返回 且向上层抛出错误
 	for device_ := range devices {
 		device := devices[device_]
 		err := app.sendToDevice(targetModuleID, targetFunction, device.COM, data)
 		if err != nil {
-			return util.NewError(_const.CommonException, _const.FailedToSendToDeviceError, false, err)
+			return util.NewError(_const.CommonException, _const.FailedToSendToDeviceError, err)
 		}
 	}
 	return nil
@@ -63,7 +63,7 @@ func (app *SerialApp) sendToDevice(targetModuleID byte, targetFunction string, C
 	// 根据COM口获取对应的串口对象
 	device := app.serialDevicesByCOM[COM]
 	if !device.isConnected {
-		return util.NewError(_const.TrivialException, _const.PortNotConnectedError, false, nil)
+		return util.NewError(_const.TrivialException, _const.PortNotConnectedError, nil)
 		//如果没连上 则返回连接错误
 	}
 	// 刷新串口 保证之前的数据都发出去了
