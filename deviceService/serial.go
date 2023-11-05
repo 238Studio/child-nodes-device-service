@@ -40,7 +40,7 @@ func (app *SerialApp) send(targetModuleID byte, targetFunction string, data *[]b
 	defer app.mu.Unlock()
 	devices, ok := app.serialDevicesBySubModuleID[targetModuleID]
 	if !ok {
-		return util.NewError(_const.TrivialException, _const.DeviceNoTargetModuleError, nil)
+		return nil
 	}
 	// 没有对应模块 则直接返回 且向上层抛出错误
 	for device_ := range devices {

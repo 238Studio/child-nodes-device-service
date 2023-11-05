@@ -1,6 +1,7 @@
 github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.2 h1:xwGGhrJgRFEQVxWDLZfG9vCjlj3JfRuHpp6WPBiEdOI=
 github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.2/go.mod h1:Bt1nL4+xQ5ns+fatFxE0xoiuiE5NeoAMPcraY6TxilY=
 github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.4/go.mod h1:Bt1nL4+xQ5ns+fatFxE0xoiuiE5NeoAMPcraY6TxilY=
+github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.5/go.mod h1:Bt1nL4+xQ5ns+fatFxE0xoiuiE5NeoAMPcraY6TxilY=
 github.com/UniversalRobotDriveTeam/child-nodes-basic v1.0.0 h1:Nu3VaYAi5vQY5fvw+9vJajPT1z87vxfCg+I3K0F90rs=
 github.com/UniversalRobotDriveTeam/child-nodes-basic v1.0.0/go.mod h1:hYI8mewgFSaJex7g6mERhbBwC2HgvlvuR/36rE7P7zg=
 github.com/creack/goselect v0.1.2 h1:2DNy14+JPjRBgPzAd1thbQp4BSIihxcBf0IXhQXDRa0=
