@@ -1,7 +1,6 @@
 package deviceService
 
 import (
-	"github.com/UniversalRobotDriveTeam/child-nodes-assist/util"
 	"github.com/tarm/serial"
 	"sync"
 	"time"
@@ -92,8 +91,7 @@ type SerialMessage struct {
 // SerialChannel 和串口进行交互的对象
 type SerialChannel struct {
 	// 串口应用
-	app                 *SerialApp
-	receiveErrorChannel chan *util.CustomError
+	app *SerialApp
 	// 模块从下位机收到数据的通道
 	receiveDataChannel chan *SerialMessage
 	// 模块发送讯息到下位机
