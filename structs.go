@@ -1,9 +1,10 @@
-package deviceService
+package device
 
 import (
-	"github.com/tarm/serial"
 	"sync"
 	"time"
+
+	"github.com/tarm/serial"
 )
 
 // 子节点模块

@@ -1,8 +1,10 @@
-package deviceService
+package device
 
 import (
-	_const "github.com/UniversalRobotDriveTeam/child-nodes-assist/const"
-	"github.com/UniversalRobotDriveTeam/child-nodes-assist/util"
+	"errors"
+
+	_const "github.com/238Studio/child-nodes-assist/const"
+	"github.com/238Studio/child-nodes-assist/util"
 )
 
 // Uint32ToBytes uint32->bytes
@@ -40,14 +42,14 @@ func (app *SerialApp) send(targetModuleID byte, targetFunction string, data *[]b
 	defer app.mu.Unlock()
 	devices, ok := app.serialDevicesBySubModuleID[targetModuleID]
 	if !ok {
-		return nil
+		return util.NewError(_const.CommonException, _const.Device, errors.New("map key not exist"))
 	}
 	// 没有对应模块 则直接返回 且向上层抛出错误
 	for device_ := range devices {
 		device := devices[device_]
 		err := app.sendToDevice(targetModuleID, targetFunction, device.COM, data)
 		if err != nil {
-			return util.NewError(_const.CommonException, _const.FailedToSendToDeviceError, err)
+			return util.NewError(_const.CommonException, _const.Device, err)
 		}
 	}
 	return nil
@@ -63,13 +65,13 @@ func (app *SerialApp) sendToDevice(targetModuleID byte, targetFunction string, C
 	// 根据COM口获取对应的串口对象
 	device := app.serialDevicesByCOM[COM]
 	if !device.isConnected {
-		return util.NewError(_const.TrivialException, _const.PortNotConnectedError, nil)
+		return util.NewError(_const.TrivialException, _const.Device, errors.New("port not connected"))
 		//如果没连上 则返回连接错误
 	}
 	// 刷新串口 保证之前的数据都发出去了
 	err := device.portIO.Flush()
 	if err != nil {
-		return err
+		return util.NewError(_const.TrivialException, _const.Device, err)
 		// IO错误扔回去 让上层重试 如果确实失败则放弃传输 并重新初始化
 	}
 	// 奇校验码
@@ -100,7 +102,7 @@ func (app *SerialApp) sendToDevice(targetModuleID byte, targetFunction string, C
 	// 发送数据
 	_, err__ := device.portIO.Write(out)
 	if err__ != nil {
-		return err
+		return util.NewError(_const.TrivialException, _const.Device, err__)
 	}
 	// IO错误扔回去
 	return nil
@@ -116,7 +118,7 @@ func (serialChannel *SerialChannel) StartSendMessage() {
 			// 如果出错 则录入错误数据库
 			err := serialChannel.app.send(data.targetModuleID, data.targetFunction, &data.data)
 			if err != nil {
-				// todo
+				// todo:err
 			}
 		case <-serialChannel.stopSendDataChannel:
 			break
@@ -147,7 +149,7 @@ func (app *SerialApp) StartListenMessage(COM string) {
 	go func() {
 		err := app.ListenMessagePerDevice(COM)
 		if err != nil {
-
+			//TODO:err
 		}
 	}()
 	//如果失败则向上抛出错误
@@ -156,19 +158,20 @@ func (app *SerialApp) StartListenMessage(COM string) {
 // StartAllListenMessage 监听下位机传入数据 把下位机内的数据传递到指定模块
 // 传入：无
 // 传出：无
+// TODO:有待讨论的
 func (app *SerialApp) StartAllListenMessage() *[]error {
-	errors := make([]error, 0)
+	errs := make([]error, 0)
 	for COM, _ := range app.serialDevicesByCOM {
 		COM := COM
 		go func() {
 			err := app.ListenMessagePerDevice(COM)
 			if err != nil {
-				errors = append(errors, err)
+				errs = append(errs, err)
 			}
 		}()
 		//如果出错则返回给调用函数
 	}
-	return &errors
+	return &errs
 }
 
 // ListenMessagePerDevice 监听单个下位机传入的原始讯息 并在分析后传递到指定模块
@@ -195,7 +198,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 				// 如果读取错误 刷新串口内容 将缓存清空
 				err := app.serialDevicesByCOM[COM].portIO.Flush()
 				if err != nil {
-					//todo
+					//todo:err
 					app.StopListenMessage(COM)
 					// 如果刷新串口失败则打印错误并关闭消息监听
 				}
@@ -203,7 +206,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 				d := make([]byte, 0)
 				err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
 				if err1 != nil {
-					//todo
+					//todo:err
 					app.StopListenMessage(COM)
 				}
 				continue
@@ -233,7 +236,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 					d := make([]byte, 0)
 					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
 					if err1 != nil {
-						//todo
+						//todo:err
 						app.StopListenMessage(COM)
 					}
 					continue
@@ -248,7 +251,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 					d := make([]byte, 0)
 					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
 					if err1 != nil {
-						//todo
+						//todo:err
 						app.StopListenMessage(COM)
 					}
 					continue
@@ -262,7 +265,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 					serialMessage := app.dataCache[COM][id]
 					err := app.send(serialMessage.targetModuleID, serialMessage.targetFunction, &serialMessage.data)
 					if err != nil {
-						return err
+						return util.NewError(_const.CommonException, _const.Device, err)
 					}
 					//todo
 				}

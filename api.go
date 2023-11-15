@@ -1,4 +1,4 @@
-package deviceService
+package device
 
 import "github.com/tarm/serial"
 
@@ -19,26 +19,28 @@ func (app *SerialApp) RemoveDeviceFromSerialApp(COM string) {
 // OpenPort 打开某个硬件的端口
 // 传入：该硬件的COM口
 // 传出：无
-func (app *SerialApp) OpenPort(COM string) {
+func (app *SerialApp) OpenPort(COM string) error {
 	portIO, err := serial.OpenPort(&app.serialDevicesByCOM[COM].serialConfig)
 	if err != nil {
-		//TODO:ERR
+		return err
 	}
 	app.serialDevicesByCOM[COM].portIO = portIO
 	app.serialDevicesByCOM[COM].isConnected = true
+
+	return nil
 }
 
 // ClosePort 关闭某个硬件的端口
 // 传入：该硬件COM口
 // 传出：无
-func (app *SerialApp) ClosePort(COM string) {
+func (app *SerialApp) ClosePort(COM string) error {
 	if app.serialDevicesByCOM[COM].isConnected {
 		err := app.serialDevicesByCOM[COM].portIO.Close()
 		if err != nil {
-			//TODO:ERR
-			return
+			return err
 		}
 	}
+	return nil
 }
 
 // RegisterSubModulesWithDevice 注册下位机关联模块 下位机功能模块->下位机集合 实现映射

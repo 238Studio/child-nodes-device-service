@@ -1,12 +1,13 @@
-package deviceService
+package device
 
 import (
-	_const "github.com/UniversalRobotDriveTeam/child-nodes-assist/const"
-	"go.bug.st/serial"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	_const "github.com/238Studio/child-nodes-assist/const"
+	"go.bug.st/serial"
 )
 import serial_ "github.com/tarm/serial"
 
@@ -60,7 +61,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 		app.serialDevicesByCOM[COM] = serialDevice
 	}
 	// 启动COM口
-	for COM, _ := range app.serialDevicesByCOM {
+	for COM := range app.serialDevicesByCOM {
 		app.OpenPort(COM)
 	}
 	// 初始化初始化模块
@@ -72,9 +73,12 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	initSerialModuleApp.dataProcessor.rightDevices = make([]string, 0)
 	initSerialModuleApp.serialDevicesBySubModuleID = make(map[byte]map[string]*SerialDevice)
 	// 给下位机发送初始化验证讯号
-	for COM, _ := range app.serialDevicesByCOM {
+	for COM := range app.serialDevicesByCOM {
 		d := initSerialModuleApp.dataProcessor.ProcessSendData(COM)
-		app.sendToDevice(_const.InitModule, "", COM, &d)
+		err := app.sendToDevice(_const.InitModule, "", COM, &d)
+		if err != nil {
+			//TODO:err
+		}
 	}
 	// 开始启动消息管道监听
 	go app.StartAllListenMessage()
@@ -82,7 +86,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	app.StartAllListenMessage()
 	time.Sleep(delayTime)
 	initSerialModuleApp.channel.stopSendDataChannel <- 0
-	for COM, _ := range app.serialDevicesByCOM {
+	for COM := range app.serialDevicesByCOM {
 		isIn := false
 		for _, COM_ := range initSerialModuleApp.dataProcessor.rightDevices {
 			if COM == COM_ {
