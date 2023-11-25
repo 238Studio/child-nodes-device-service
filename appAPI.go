@@ -14,6 +14,7 @@ func (app *SerialApp) PutDeviceIntoSerialApp(device *SerialDevice) {
 // 传出：无
 func (app *SerialApp) RemoveDeviceFromSerialApp(COM string) {
 	delete(app.serialDevicesByCOM, COM)
+	app.DeregisterSubModulesWithDevice(COM)
 }
 
 // OpenPort 打开某个硬件的端口
@@ -46,7 +47,7 @@ func (app *SerialApp) ClosePort(COM string) error {
 // RegisterSubModulesWithDevice 注册下位机关联模块 下位机功能模块->下位机集合 实现映射
 // 传入：关联模块moduleID，下位机COM
 // 传出：无
-func (app *SerialApp) RegisterSubModulesWithDevice(moduleID []byte, COM string) {
+func (app *SerialApp) RegisterSubModulesWithDevice(moduleID []uint32, COM string) {
 	for moduleID_ := range moduleID {
 		_, ok := app.serialDevicesBySubModuleID[moduleID[moduleID_]]
 		if !ok {
@@ -71,7 +72,7 @@ func (app *SerialApp) DeregisterSubModulesWithDevice(COM string) {
 // GetSerialMessageChannel 获取并注册消息通道
 // 传入：子节点模块ID
 // 传出：串口消息通道
-func (app *SerialApp) GetSerialMessageChannel(nodeModuleID byte) *SerialChannel {
+func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChannel {
 	channel := new(SerialChannel)
 	channel.app = app
 	channel.receiveDataChannel = make(chan *SerialMessage, 1)
@@ -84,6 +85,6 @@ func (app *SerialApp) GetSerialMessageChannel(nodeModuleID byte) *SerialChannel 
 // RemoveSerialChannel 取消注册一个消息通道
 // 传入：子节点模块ID
 // 传出：无
-func (app *SerialApp) RemoveSerialChannel(nodeModuleID byte) {
+func (app *SerialApp) RemoveSerialChannel(nodeModuleID uint32) {
 	delete(app.serialChannelByNodeModulesID, nodeModuleID)
 }

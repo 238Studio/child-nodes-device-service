@@ -1,8 +1,6 @@
 package device
 
 import (
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,13 +17,10 @@ func InitSerialApp(Baud int, ReadTimeout time.Duration, sendCacheLength int) *Se
 	app.mu = new(sync.Mutex)
 	app.isAlive = false
 	app.serialDevicesByCOM = make(map[string]*SerialDevice)
-	app.serialDevicesBySubModuleID = make(map[byte]map[string]*SerialDevice)
-	app.serialChannelByNodeModulesID = make(map[byte]*SerialChannel, 1)
-	app.stopListenSubMessageChannel = make(map[string]chan int, 1)
-	app.serialDevicesFunctionByModuleID = make(map[byte][]string, 1)
-	app.dataCache = make(map[string][]*SerialMessage, sendCacheLength)
-	app.maxDataCache = sendCacheLength
-	app.dataCacheIDNow = 0
+	app.serialDevicesBySubModuleID = make(map[uint32]map[string]*SerialDevice)
+	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel, 1)
+	app.stopListenSubMessageChannel = make(map[string]chan struct{})
+	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
 	app.Baud = Baud
 	app.ReadTimeout = ReadTimeout
 	return app
@@ -52,7 +47,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 		serialDevice := new(SerialDevice)
 		serialDevice.COM = COM
 		serialDevice.isConnected = false
-		serialDevice.SubModuleID = make([]byte, 0)
+		serialDevice.SubModuleID = make([]uint32, 0)
 		serialDevice.serialConfig = serial_.Config{
 			Name:        COM,
 			Baud:        app.Baud,
@@ -62,7 +57,11 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	}
 	// 启动COM口
 	for COM := range app.serialDevicesByCOM {
-		app.OpenPort(COM)
+		err := app.OpenPort(COM)
+		if err != nil {
+			return err
+		}
+		//todo:err
 	}
 	// 初始化初始化模块
 	initMessageChannel := app.GetSerialMessageChannel(_const.InitModule)
@@ -85,7 +84,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	// 开始监听 并监听一段时间
 	app.StartAllListenMessage()
 	time.Sleep(delayTime)
-	initSerialModuleApp.channel.stopSendDataChannel <- 0
+	initSerialModuleApp.channel.stopSendDataChannel <- struct{}{}
 	for COM := range app.serialDevicesByCOM {
 		isIn := false
 		for _, COM_ := range initSerialModuleApp.dataProcessor.rightDevices {
@@ -114,27 +113,27 @@ func (app *InitSerialModuleApp) startListenInitModule() {
 	}
 }
 
-// ProcessReadData 从串口里读取 并处理数据
+// ProcessReadData 从串口里读取 并处理数据 来完成下位机和它的功能模块的映射关系
+/*传回数据的格式是
+COMLen COM modulesNum modules
+*/
 // 传入：数据
 // 传出：无
 func (processor *InitSerialDataProcessor) ProcessReadData(data []byte) {
+	// 获得下位机COM口
 	COMLen := data[0]
 	COM := string(data[1:COMLen])
-	modules_ := strings.Split(string(data[COMLen:]), "%")
-	for i := range modules_ {
-		ms := strings.Split(modules_[i], "&")
-		fs := strings.Split(ms[1], ",")
-		subModuleID, err := strconv.ParseInt(ms[0], 10, 8)
-		if err != nil {
-			return
-		}
-		// 数据格式错误则直接返回
-		processor.app.serialDevicesFunctionByModuleID[byte(subModuleID)] = fs
-		_, ok := processor.app.serialDevicesBySubModuleID[byte(subModuleID)]
+	modulesNum := BytesToUint32(data[2:6])
+	// 获得下位机支持的功能模块并进行注册
+	var i uint32 = 0
+	for i < modulesNum {
+		i++
+		module := BytesToUint32(data[6+i*4 : 10+i*4])
+		_, ok := processor.app.serialDevicesBySubModuleID[module]
 		if !ok {
-			processor.app.serialDevicesBySubModuleID[byte(subModuleID)] = make(map[string]*SerialDevice)
+			processor.app.serialDevicesBySubModuleID[module] = make(map[string]*SerialDevice)
 		}
-		processor.app.serialDevicesBySubModuleID[byte(subModuleID)][COM] = processor.app.serialDevicesByCOM[COM]
+		processor.app.serialDevicesBySubModuleID[module][COM] = processor.app.serialDevicesByCOM[COM]
 	}
 	processor.rightDevices = append(processor.rightDevices, COM)
 }

@@ -37,7 +37,7 @@ func BytesToUint32(bytes []byte) uint32 {
 // 通过串口发送数据给单个下位机 根据对应的模块功能
 // 传入：下位机的模块ID
 // 传出：无
-func (app *SerialApp) send(targetModuleID byte, targetFunction string, data *[]byte) error {
+func (app *SerialApp) send(channel *SerialChannel, targetModuleID uint32, targetFunction string, data *[]byte) error {
 	app.mu.Lock()
 	defer app.mu.Unlock()
 	devices, ok := app.serialDevicesBySubModuleID[targetModuleID]
@@ -47,21 +47,24 @@ func (app *SerialApp) send(targetModuleID byte, targetFunction string, data *[]b
 	// 没有对应模块 则直接返回 且向上层抛出错误
 	for device_ := range devices {
 		device := devices[device_]
+		app.sendingChannelByCOM[device.COM] = channel
 		err := app.sendToDevice(targetModuleID, targetFunction, device.COM, data)
 		if err != nil {
 			return util.NewError(_const.CommonException, _const.Device, err)
 		}
+		app.sendingChannelByCOM[device.COM] = nil
 	}
+
 	return nil
 }
 
 /*
- 数据的格式是 帧头  报总长度（不包含帧头帧尾） 目标模块编号 目标功能长度 目标功能 数据长度 数据 数据报ID 奇校验位 帧尾
+ 数据的格式是 帧头  报总长度（不包含帧头帧尾和奇偶校验） 目标模块编号 目标功能长度 目标功能 数据长度 数据 奇校验位 帧尾
 */
 // 发送数据到指定端口的下位机
 // 传入：COM，数据
 // 传出：无
-func (app *SerialApp) sendToDevice(targetModuleID byte, targetFunction string, COM string, data *[]byte) error {
+func (app *SerialApp) sendToDevice(targetModuleID uint32, targetFunction string, COM string, data *[]byte) error {
 	// 根据COM口获取对应的串口对象
 	device := app.serialDevicesByCOM[COM]
 	if !device.isConnected {
@@ -83,13 +86,13 @@ func (app *SerialApp) sendToDevice(targetModuleID byte, targetFunction string, C
 	// 模块功能名长度
 	functionLen := byte(len(function))
 	// 按照顺序合并发送数据
-	out = append(out, targetModuleID, functionLen)
+	out = append(out, Uint32ToBytes(targetModuleID)...)
+	out = append(out, functionLen)
 	out = append(out, function...)
 	out = append(out, Uint32ToBytes(uint32(len(*data)))...)
 	out = append(out, *data...)
-	out = append(Uint32ToBytes(uint32(len(out)+4)), out...)
+	out = append(Uint32ToBytes(uint32(len(out))), out...)
 	out = append([]byte{_const.PortHead}, out...)
-	out = append(out, _const.PortEnd)
 	// 奇校验码
 	x := 0
 	for i := range out {
@@ -99,6 +102,7 @@ func (app *SerialApp) sendToDevice(targetModuleID byte, targetFunction string, C
 		verify = 1
 	}
 	out = append(out, verify)
+	out = append(out, _const.PortEnd)
 	// 发送数据
 	_, err__ := device.portIO.Write(out)
 	if err__ != nil {
@@ -116,7 +120,7 @@ func (serialChannel *SerialChannel) StartSendMessage() {
 		select {
 		case data := <-serialChannel.sendDataChannel:
 			// 如果出错 则录入错误数据库
-			err := serialChannel.app.send(data.targetModuleID, data.targetFunction, &data.data)
+			err := serialChannel.app.send(serialChannel, data.targetModuleID, data.targetFunction, &data.data)
 			if err != nil {
 				// todo:err
 			}
@@ -130,7 +134,7 @@ func (serialChannel *SerialChannel) StartSendMessage() {
 // 传入：COM
 // 传出：无
 func (app *SerialApp) StopListenMessage(COM string) {
-	app.stopListenSubMessageChannel[COM] <- 0
+	app.stopListenSubMessageChannel[COM] <- struct{}{}
 }
 
 // StopAllListenMessage 终止对所有下位机的传入数据的监听
@@ -216,29 +220,44 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 			if num > 0 {
 				data = append(data, buffer[:num]...)
 			}
+			// 如果这个缓存的内容是一个数据报最开始的部分
 			if isHead {
-				// 如果头错误 则要求重发 并直接返回 等待重发的消息
-				dataLen = BytesToUint32(buffer[1:5])
-				isHead = false
-				data = append(lastBuffer, data...)
-			}
-			// 如果达到数据长度则传出报告
-			if uint32(len(data)) > (dataLen + 2) {
-				// 重新回到报头
-				isHead = true
-				// 报尾
-				end := data[dataLen+1]
-				// 数据
-				data_ := data[1:dataLen]
-				lastBuffer = data[dataLen+2:]
-				if end != _const.PortEnd {
-					// 通知下位机重发
+				// 如果头错误 则要求重发 并清空缓存
+				if buffer[0] != _const.PortHead {
 					d := make([]byte, 0)
 					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
 					if err1 != nil {
 						//todo:err
 						app.StopListenMessage(COM)
 					}
+					buffer = make([]byte, _const.PortMaxLen)
+					lastBuffer = make([]byte, _const.PortMaxLen)
+					continue
+				}
+				dataLen = BytesToUint32(buffer[1:5])
+				isHead = false
+				data = append(lastBuffer, data...)
+			}
+			// 如果达到数据长度则传出报告
+			// 由于数据长度没有包含帧头帧尾和奇偶校验 所以要加2
+			if uint32(len(data)) > (dataLen + 2) {
+				// 重新回到报头
+				isHead = true
+				// 报尾 因为数据长度不包含帧头帧尾和奇偶校验
+				end := data[dataLen+2]
+				// 刨除帧头帧尾的数据部分
+				data_ := data[1 : dataLen+2]
+				lastBuffer = data[dataLen+2:]
+				if end != _const.PortEnd {
+					// 通知下位机重发 并清空缓存
+					d := make([]byte, 0)
+					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
+					if err1 != nil {
+						//todo:err
+						app.StopListenMessage(COM)
+					}
+					buffer = make([]byte, _const.PortMaxLen)
+					lastBuffer = make([]byte, _const.PortMaxLen)
 					continue
 				}
 				// 进行奇校验 如果奇校验没有通过 则要求重发
@@ -246,57 +265,37 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 				for _, d := range data {
 					x += int(d)
 				}
+				// 奇偶校验不通过
 				if x%2 == 0 {
-					// 向下位机发送重发的要求 并直返回 等待重发的消息
+					// 向下位机发送重发的要求 并清空缓存
 					d := make([]byte, 0)
-					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
+					err1 := app.sendToDevice(uint32(_const.SerialVerify), _const.FailedToRev, COM, &d)
 					if err1 != nil {
 						//todo:err
 						app.StopListenMessage(COM)
 					}
+					buffer = make([]byte, _const.PortMaxLen)
+					lastBuffer = make([]byte, _const.PortMaxLen)
 					continue
 				}
 				message := new(SerialMessage)
-				message.targetModuleID = data_[4]
-				functionLen := data_[5]
-				// 如果是SerialVerify 则通知重发
-				if data_[4] == _const.SerialVerify {
-					id := int(data_[6])
-					serialMessage := app.dataCache[COM][id]
-					err := app.send(serialMessage.targetModuleID, serialMessage.targetFunction, &serialMessage.data)
+				message.targetModuleID = BytesToUint32(data_[4:8])
+				functionLen := data_[8]
+				// 如果是SerialVerify 则通知发送失败
+				// todo:通知发送失败
+				if message.targetModuleID == _const.SerialVerify {
 					if err != nil {
 						return util.NewError(_const.CommonException, _const.Device, err)
 					}
-					//todo
+					//并清空这个COM口发送了一部分的讯息
+					app.sendingChannelByCOM[COM].stopSendDataChannel <- struct{}{}
+					<-app.sendingChannelByCOM[COM].sendDataChannel
 				}
-				message.targetFunction = string(data_[6 : 6+functionLen])
-				dataOut := data_[6+functionLen:]
+				message.targetFunction = string(data_[9 : 9+functionLen])
+				dataOut := data_[9+functionLen : len(data_)-1]
 				message.data = dataOut
 				(app.serialChannelByNodeModulesID[message.targetModuleID]).receiveDataChannel <- message
 			}
 		}
 	}
-	//todo:err nil
-}
-
-// 在发送数据缓存中加入数据 这个数组会抛弃最后一个数据 并返回一个目前发送数据的ID
-// 传入：数据指针
-// 传出：无
-func (app *SerialApp) putDataToCache(COM string, message *SerialMessage) int {
-	defer func() {
-		if app.dataCacheIDNow == (len(app.dataCache) - 1) {
-			app.dataCacheIDNow = 0
-		} else {
-			app.dataCacheIDNow++
-		}
-	}()
-	app.dataCache[COM][app.dataCacheIDNow] = message
-	return app.dataCacheIDNow
-}
-
-// 根据ID提取一个发送数据缓存中的数据
-// 传入：数据ID
-// 传出：数据指针
-func (app *SerialApp) getDataFromCache(COM string, messageID int) *SerialMessage {
-	return app.dataCache[COM][messageID]
 }

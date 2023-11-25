@@ -18,7 +18,7 @@ type SerialDevice struct {
 	// 串口通讯
 	portIO *serial.Port
 	// 该串口对应的下位机功能模块（注意 不是实际模块 而是注册的功能模块） moduleID
-	SubModuleID []byte
+	SubModuleID []uint32
 	// 是否处于连接状态
 	isConnected bool
 }
@@ -32,21 +32,15 @@ type SerialApp struct {
 	// 互斥锁
 	mu *sync.Mutex
 	// 从下位机的模块对应了若干个下位机的串口收发模块 NodeModuleID->SerialAppPerDevice
-	serialDevicesBySubModuleID map[byte]map[string]*SerialDevice
-	// 下位机模块功能映射
-	serialDevicesFunctionByModuleID map[byte][]string
+	serialDevicesBySubModuleID map[uint32]map[string]*SerialDevice
 	// COM->SerialAppPerDevice
 	serialDevicesByCOM map[string]*SerialDevice
-	// 从子节点功能模块对应到moduleID->SerialChannel
-	serialChannelByNodeModulesID map[byte]*SerialChannel
+	// 从子节点功能模块对应到SerialChannel
+	serialChannelByNodeModulesID map[uint32]*SerialChannel
 	// 中止接收下位机传来信息的通道 COM->channel
-	stopListenSubMessageChannel map[string]chan int
-	// 最大数据缓存长度
-	maxDataCache int
-	// 数据缓存 重发用 COM->data指针
-	dataCache map[string][]*SerialMessage
-	// 当前缓存指向的数据
-	dataCacheIDNow int
+	stopListenSubMessageChannel map[string]chan struct{}
+	// 正在通过这些COM口进行发送讯息的channel
+	sendingChannelByCOM map[string]*SerialChannel
 	// 是否运行
 	isAlive bool
 }
@@ -82,7 +76,7 @@ type SerialMessage struct {
 	下位机的功能模块 比较多样且可以自定义 例如底盘驱动 云台 或者发射器等 而上位机的功能模块则只有少数几个
 	包括了 传感器反馈，错误通道，数据报告，初始化4个 也就是分别是传感器反馈的数据 底层出现软件错误汇报的错误 以及报告底层软件状态的数据报告
 	*/
-	targetModuleID byte
+	targetModuleID uint32
 	// 目标模块功能
 	targetFunction string
 	// 数据
@@ -98,5 +92,5 @@ type SerialChannel struct {
 	// 模块发送讯息到下位机
 	sendDataChannel chan *SerialMessage
 	// 中止发送数据通道
-	stopSendDataChannel chan int
+	stopSendDataChannel chan struct{}
 }
