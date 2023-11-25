@@ -101,4 +101,37 @@ appAPI.go这个文件记录的是关于serialApp的方法。
 - 类型：`uint32`
 - 需要转换的32位无符号整数
 
+## `BytesToUint32(bytes []byte) uint32`
 
+## 描述
+将4位bytes转为Uint32
+
+## 传入
+- 类型：`[]byte`
+- 需要转换的bytes
+
+## 传出
+- 类型：`uint32`
+- uint32
+
+## `(app *SerialApp) send(channel *SerialChannel, targetModuleID uint32, targetFunction string, data *[]byte) error`
+
+## 描述
+将指定数据发送到指定功能模块。可能有多个下位机拥有相同的功能模块，此时
+这些数据会被发送到这些全部下位机。
+注意，这个方法是带锁的，也就是说，当一个上位机的模块在向下位机传输数据的时候，别的
+上位机模块是不能向下位机传输数据的。
+## 传入：
+- 类型：`channel *SerialChannel`
+- 发送数据的管道
+- 类型：`targetModuleID uint32`
+- 目标模块 也就是下位机的模块名
+- 类型：`targetFunction string`
+- 目标功能 也就是下位机这个模块需要执行的特定功能
+- 类型：`data *[]byte`
+- 数据数组的指针
+
+## `(app *SerialApp) sendToDevice(targetModuleID uint32, targetFunction string, COM string, data *[]byte) error`
+
+## 描述
+将指定数据发送到特定的下位机。
