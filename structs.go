@@ -39,10 +39,10 @@ type SerialApp struct {
 	serialChannelByNodeModulesID map[uint32]*SerialChannel
 	// 中止接收下位机传来信息的通道 COM->channel
 	stopListenSubMessageChannel map[string]chan struct{}
-	// 正在通过这些COM口进行发送讯息的channel
-	sendingChannelByCOM map[string]*SerialChannel
 	// 是否运行
 	isAlive bool
+	// 发送缓存
+	sendBuffer *SendBuffer
 }
 
 // SerialDataProcessor 将原始的串口二进制数据转换成需要的对象
@@ -93,4 +93,24 @@ type SerialChannel struct {
 	sendDataChannel chan *SerialMessage
 	// 中止发送数据通道
 	stopSendDataChannel chan struct{}
+}
+
+// SendDataBuffer 发送数据缓存区，其中是将被发送或的数据
+type SendDataBuffer struct {
+	// 数据
+	data *[]byte
+	// 预备被发送的数据帧编号
+	frameID uint32
+	// 该数据报编号
+	bufferID uint32
+	// 总数据帧量
+	frameNum uint32
+}
+
+// SendBuffer 发送缓冲器
+type SendBuffer struct {
+	// 发送缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->SerialChannel->bufferID->*DataBuffer
+	sendBuffer map[string]map[*SerialChannel]map[uint32]*SendDataBuffer
+	// 发送数据报计数器 用于唯一的标记每个数据报
+	i uint32
 }

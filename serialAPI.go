@@ -7,6 +7,11 @@ import (
 	"github.com/238Studio/child-nodes-assist/util"
 )
 
+// PortLen todo
+const PortLen = 512
+
+// 注意 是bytes
+
 // Uint32ToBytes uint32->bytes
 // 传入：uint32
 // 传出：byte[4]
@@ -47,69 +52,28 @@ func (app *SerialApp) send(channel *SerialChannel, targetModuleID uint32, target
 	// 没有对应模块 则直接返回 且向上层抛出错误
 	for device_ := range devices {
 		device := devices[device_]
-		app.sendingChannelByCOM[device.COM] = channel
-		err := app.sendToDevice(targetModuleID, targetFunction, device.COM, data)
-		if err != nil {
-			return util.NewError(_const.CommonException, _const.Device, err)
-		}
-		app.sendingChannelByCOM[device.COM] = nil
+		app.readyToSendToDevice(channel, targetModuleID, targetFunction, device.COM, data)
 	}
 
 	return nil
 }
 
-/*
- 数据的格式是 帧头  报总长度（不包含帧头帧尾和奇偶校验） 目标模块编号 目标功能长度 目标功能 数据长度 数据 奇校验位 帧尾
-*/
-// 发送数据到指定端口的下位机
-// 传入：COM，数据
+// 预备发送数据到指定端口的下位机
+// 传入：目标模块ID,目标功能，COM，数据
 // 传出：无
-func (app *SerialApp) sendToDevice(targetModuleID uint32, targetFunction string, COM string, data *[]byte) error {
-	// 根据COM口获取对应的串口对象
-	device := app.serialDevicesByCOM[COM]
-	if !device.isConnected {
-		return util.NewError(_const.TrivialException, _const.Device, errors.New("port not connected"))
-		//如果没连上 则返回连接错误
-	}
-	// 刷新串口 保证之前的数据都发出去了
-	err := device.portIO.Flush()
-	if err != nil {
-		return util.NewError(_const.TrivialException, _const.Device, err)
-		// IO错误扔回去 让上层重试 如果确实失败则放弃传输 并重新初始化
-	}
-	// 奇校验码
-	verify := byte(0)
-	// 准备发送的数据
-	out := make([]byte, 0)
-	// 模块功能名
-	function := []byte(targetFunction)
-	// 模块功能名长度
-	functionLen := byte(len(function))
-	// 按照顺序合并发送数据
-	out = append(out, Uint32ToBytes(targetModuleID)...)
-	out = append(out, functionLen)
-	out = append(out, function...)
-	out = append(out, Uint32ToBytes(uint32(len(*data)))...)
-	out = append(out, *data...)
-	out = append(Uint32ToBytes(uint32(len(out))), out...)
-	out = append([]byte{_const.PortHead}, out...)
-	// 奇校验码
-	x := 0
-	for i := range out {
-		x += int(out[i])
-	}
-	if x%2 == 0 {
-		verify = 1
-	}
-	out = append(out, verify)
-	out = append(out, _const.PortEnd)
-	// 发送数据
-	_, err__ := device.portIO.Write(out)
-	if err__ != nil {
-		return util.NewError(_const.TrivialException, _const.Device, err__)
-	}
-	// IO错误扔回去
-	return nil
+func (app *SerialApp) readyToSendToDevice(channel *SerialChannel, targetModuleID uint32, targetFunction string, COM string, data *[]byte) {
+	data_ := make([]byte, 0)
+	data_ = append(data_, Uint32ToBytes(targetModuleID)...)
+	data_ = append(data_, []byte(targetFunction)...)
+	data_ = append(data_, *data...)
+	app.sendBuffer.registerSendData(COM, channel, &data_)
+}
+
+// 发送数据给下位机
+// 传入：COM口，数据
+// 传出：无
+func (app *SerialApp) sendToDevice(COM string, data *[]byte) {
+
 }
 
 // StartSendMessage 监听管道讯息 把准备发送的讯息发送到下位机
@@ -182,120 +146,5 @@ func (app *SerialApp) StartAllListenMessage() *[]error {
 // 传入：下位机COM口
 // 传出：无
 func (app *SerialApp) ListenMessagePerDevice(COM string) error {
-	// 上一次缓冲区剩下的部分
-	lastBuffer := make([]byte, 0)
-	// 缓存区
-	buffer := make([]byte, _const.PortMaxLen)
-	// 数据包
-	data := make([]byte, 0)
-	// 此时接收的是否是某个数据包最开始的一系列数据
-	isHead := true
-	// 当前数据包的大小
-	dataLen := uint32(0)
-	for {
-		select {
-		case <-app.stopListenSubMessageChannel[COM]:
-			break
-		default:
-			num, err := app.serialDevicesByCOM[COM].portIO.Read(buffer)
-			if err != nil {
-				// 如果读取错误 刷新串口内容 将缓存清空
-				err := app.serialDevicesByCOM[COM].portIO.Flush()
-				if err != nil {
-					//todo:err
-					app.StopListenMessage(COM)
-					// 如果刷新串口失败则打印错误并关闭消息监听
-				}
-				// 向下位机发送重发的要求 并直返回 等待重发的消息
-				d := make([]byte, 0)
-				err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
-				if err1 != nil {
-					//todo:err
-					app.StopListenMessage(COM)
-				}
-				continue
-			}
-			// 这个错误会打断数据流的读取 如果发生了这个读取错误 则向下位机要求重发 且抛弃缓存进行重发
-			// 如果接收到的数据长度大于零 则拼接数据包 当数据包达到指定长度的时候 完成拼接 并进行数据分析 传递到对应的管道
-			if num > 0 {
-				data = append(data, buffer[:num]...)
-			}
-			// 如果这个缓存的内容是一个数据报最开始的部分
-			if isHead {
-				// 如果头错误 则要求重发 并清空缓存
-				if buffer[0] != _const.PortHead {
-					d := make([]byte, 0)
-					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
-					if err1 != nil {
-						//todo:err
-						app.StopListenMessage(COM)
-					}
-					buffer = make([]byte, _const.PortMaxLen)
-					lastBuffer = make([]byte, _const.PortMaxLen)
-					continue
-				}
-				dataLen = BytesToUint32(buffer[1:5])
-				isHead = false
-				data = append(lastBuffer, data...)
-			}
-			// 如果达到数据长度则传出报告
-			// 由于数据长度没有包含帧头帧尾和奇偶校验 所以要加2
-			if uint32(len(data)) > (dataLen + 2) {
-				// 重新回到报头
-				isHead = true
-				// 报尾 因为数据长度不包含帧头帧尾和奇偶校验
-				end := data[dataLen+2]
-				// 刨除帧头帧尾的数据部分
-				data_ := data[1 : dataLen+2]
-				lastBuffer = data[dataLen+2:]
-				if end != _const.PortEnd {
-					// 通知下位机重发 并清空缓存
-					d := make([]byte, 0)
-					err1 := app.sendToDevice(_const.SerialVerify, _const.FailedToRev, COM, &d)
-					if err1 != nil {
-						//todo:err
-						app.StopListenMessage(COM)
-					}
-					buffer = make([]byte, _const.PortMaxLen)
-					lastBuffer = make([]byte, _const.PortMaxLen)
-					continue
-				}
-				// 进行奇校验 如果奇校验没有通过 则要求重发
-				x := 0
-				for _, d := range data {
-					x += int(d)
-				}
-				// 奇偶校验不通过
-				if x%2 == 0 {
-					// 向下位机发送重发的要求 并清空缓存
-					d := make([]byte, 0)
-					err1 := app.sendToDevice(uint32(_const.SerialVerify), _const.FailedToRev, COM, &d)
-					if err1 != nil {
-						//todo:err
-						app.StopListenMessage(COM)
-					}
-					buffer = make([]byte, _const.PortMaxLen)
-					lastBuffer = make([]byte, _const.PortMaxLen)
-					continue
-				}
-				message := new(SerialMessage)
-				message.targetModuleID = BytesToUint32(data_[4:8])
-				functionLen := data_[8]
-				// 如果是SerialVerify 则通知发送失败
-				// todo:通知发送失败
-				if message.targetModuleID == _const.SerialVerify {
-					if err != nil {
-						return util.NewError(_const.CommonException, _const.Device, err)
-					}
-					//并清空这个COM口发送了一部分的讯息
-					app.sendingChannelByCOM[COM].stopSendDataChannel <- struct{}{}
-					<-app.sendingChannelByCOM[COM].sendDataChannel
-				}
-				message.targetFunction = string(data_[9 : 9+functionLen])
-				dataOut := data_[9+functionLen : len(data_)-1]
-				message.data = dataOut
-				(app.serialChannelByNodeModulesID[message.targetModuleID]).receiveDataChannel <- message
-			}
-		}
-	}
+
 }

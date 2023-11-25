@@ -21,6 +21,10 @@ func InitSerialApp(Baud int, ReadTimeout time.Duration, sendCacheLength int) *Se
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel, 1)
 	app.stopListenSubMessageChannel = make(map[string]chan struct{})
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
+	app.sendBuffer = &SendBuffer{
+		sendBuffer: make(map[string]map[*SerialChannel]map[uint32]*SendDataBuffer),
+		i:          0,
+	}
 	app.Baud = Baud
 	app.ReadTimeout = ReadTimeout
 	return app

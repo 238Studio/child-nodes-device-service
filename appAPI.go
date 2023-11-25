@@ -77,7 +77,7 @@ func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChanne
 	channel.app = app
 	channel.receiveDataChannel = make(chan *SerialMessage, 1)
 	channel.sendDataChannel = make(chan *SerialMessage, 1)
-	channel.stopSendDataChannel = make(chan int, 1)
+	channel.stopSendDataChannel = make(chan struct{})
 	app.serialChannelByNodeModulesID[nodeModuleID] = channel
 	return channel
 }
