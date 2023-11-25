@@ -10,6 +10,18 @@ import (
 // PortLen todo
 const PortLen = 512
 
+// FailedToRev 接收失败
+const FailedToRev uint32 = 0xf0
+
+// SuccessRev 接收成功
+const SuccessRev uint32 = 0xf1
+
+// ReadyResend 预备重发
+const ReadyResend uint32 = 0xf2
+
+// CancelResend 取消重发
+const CancelResend uint32 = 0xf3
+
 // 注意 是bytes
 
 // Uint32ToBytes uint32->bytes
@@ -66,14 +78,39 @@ func (app *SerialApp) readyToSendToDevice(channel *SerialChannel, targetModuleID
 	data_ = append(data_, Uint32ToBytes(targetModuleID)...)
 	data_ = append(data_, []byte(targetFunction)...)
 	data_ = append(data_, *data...)
-	app.sendBuffer.registerSendData(COM, channel, &data_)
+	id := app.sendBuffer.registerSendData(COM, channel, &data_)
+	app.sendBuffer.readySend(COM, channel, id)
 }
 
 // 发送数据给下位机
-// 传入：COM口，数据
+// 传入：COM口，数据，尝试次数
 // 传出：无
-func (app *SerialApp) sendToDevice(COM string, data *[]byte) {
+var buffer0 []byte = make([]byte, 4)
 
+func (app *SerialApp) sendToDevice(COM string, data *[]byte, times int) error {
+	device := app.serialDevicesByCOM[COM]
+	// 向串口写入
+	_, err := device.portIO.Write(*data)
+	if err != nil {
+		return err
+		//todo
+	}
+	// 等待串口返回确认数据报
+	_, err_ := device.portIO.Read(buffer0)
+	if err_ != nil {
+		return err
+		//todo
+	}
+	if BytesToUint32(buffer0) != SuccessRev {
+		if times > app.maxResendTimes {
+			return util.NewError(_const.CommonException, _const.Device, errors.New("ResendFailedOverMaxTimes"))
+		}
+		err := app.sendToDevice(COM, data, times+1)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // StartSendMessage 监听管道讯息 把准备发送的讯息发送到下位机

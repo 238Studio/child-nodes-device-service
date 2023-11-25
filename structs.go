@@ -43,6 +43,8 @@ type SerialApp struct {
 	isAlive bool
 	// 发送缓存
 	sendBuffer *SendBuffer
+	// 最大发送尝试次数
+	maxResendTimes int
 }
 
 // SerialDataProcessor 将原始的串口二进制数据转换成需要的对象
@@ -109,8 +111,10 @@ type SendDataBuffer struct {
 
 // SendBuffer 发送缓冲器
 type SendBuffer struct {
-	// 发送缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->SerialChannel->bufferID->*DataBuffer
+	// 发送总缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->SerialChannel->bufferID->*DataBuffer
 	sendBuffer map[string]map[*SerialChannel]map[uint32]*SendDataBuffer
+	// 预备发送缓冲区，这里的是正在轮换发送的数据
+	readySendBuffer map[string]map[*SerialChannel]map[uint32]*SendDataBuffer
 	// 发送数据报计数器 用于唯一的标记每个数据报
 	i uint32
 }

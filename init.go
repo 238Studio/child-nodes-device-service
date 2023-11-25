@@ -12,7 +12,7 @@ import serial_ "github.com/tarm/serial"
 // InitSerialApp 初始化SerialApp
 // 传入：COM口，波特率，超时时间
 // 传出：未启动的串口
-func InitSerialApp(Baud int, ReadTimeout time.Duration, sendCacheLength int) *SerialApp {
+func InitSerialApp(Baud int, ReadTimeout time.Duration, maxResendTimes int) *SerialApp {
 	app := new(SerialApp)
 	app.mu = new(sync.Mutex)
 	app.isAlive = false
@@ -21,9 +21,11 @@ func InitSerialApp(Baud int, ReadTimeout time.Duration, sendCacheLength int) *Se
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel, 1)
 	app.stopListenSubMessageChannel = make(map[string]chan struct{})
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
+	app.maxResendTimes = maxResendTimes
 	app.sendBuffer = &SendBuffer{
-		sendBuffer: make(map[string]map[*SerialChannel]map[uint32]*SendDataBuffer),
-		i:          0,
+		sendBuffer:      make(map[string]map[*SerialChannel]map[uint32]*SendDataBuffer),
+		readySendBuffer: make(map[string]map[*SerialChannel]map[uint32]*SendDataBuffer),
+		i:               0,
 	}
 	app.Baud = Baud
 	app.ReadTimeout = ReadTimeout
