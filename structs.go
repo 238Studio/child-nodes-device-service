@@ -112,9 +112,13 @@ type SendDataBuffer struct {
 // SendBuffer 发送缓冲器
 type SendBuffer struct {
 	// 发送总缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->SerialChannel->bufferID->*DataBuffer
-	sendBuffer map[string]map[*SerialChannel]map[uint32]*SendDataBuffer
+	sendBuffer map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer
 	// 预备发送缓冲区，这里的是正在轮换发送的数据
-	readySendBuffer map[string]map[*SerialChannel]map[uint32]*SendDataBuffer
+	readySendBuffer map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer
 	// 发送数据报计数器 用于唯一的标记每个数据报
 	i uint32
+	// 发送线程的停止管道 COM->chan
+	sendFuncStopChannels map[string]chan struct{}
+	// App
+	app *SerialApp
 }

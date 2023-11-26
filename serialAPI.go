@@ -7,22 +7,24 @@ import (
 	"github.com/238Studio/child-nodes-assist/util"
 )
 
-// PortLen todo
-const PortLen = 512
-
-// FailedToRev 接收失败
-const FailedToRev uint32 = 0xf0
-
-// SuccessRev 接收成功
-const SuccessRev uint32 = 0xf1
-
-// ReadyResend 预备重发
-const ReadyResend uint32 = 0xf2
-
-// CancelResend 取消重发
-const CancelResend uint32 = 0xf3
-
-// 注意 是bytes
+// CalculateOddParity 获得奇校验数
+// 传入：数据
+// 传出：奇校验数
+func CalculateOddParity(data *[]byte) byte {
+	// 计算数据中包含的 "1" 的数量
+	countOnes := 0
+	for _, b := range *data {
+		// 使用位运算检查每个字节中包含的 "1" 的数量
+		for i := 0; i < 8; i++ {
+			countOnes += int((b >> uint(i)) & 1)
+		}
+	}
+	// 判断奇偶性并返回校验位
+	if countOnes%2 == 1 {
+		return 1
+	}
+	return 0
+}
 
 // Uint32ToBytes uint32->bytes
 // 传入：uint32
@@ -78,8 +80,8 @@ func (app *SerialApp) readyToSendToDevice(channel *SerialChannel, targetModuleID
 	data_ = append(data_, Uint32ToBytes(targetModuleID)...)
 	data_ = append(data_, []byte(targetFunction)...)
 	data_ = append(data_, *data...)
-	id := app.sendBuffer.registerSendData(COM, channel, &data_)
-	app.sendBuffer.readySend(COM, channel, id)
+	id := app.sendBuffer.RegisterSendData(COM, channel, &data_)
+	app.sendBuffer.ReadySend(COM, channel, id)
 }
 
 // 发送数据给下位机
@@ -101,7 +103,7 @@ func (app *SerialApp) sendToDevice(COM string, data *[]byte, times int) error {
 		return err
 		//todo
 	}
-	if BytesToUint32(buffer0) != SuccessRev {
+	if BytesToUint32(buffer0) != _const.SuccessRev {
 		if times > app.maxResendTimes {
 			return util.NewError(_const.CommonException, _const.Device, errors.New("ResendFailedOverMaxTimes"))
 		}

@@ -22,10 +22,13 @@ func InitSerialApp(Baud int, ReadTimeout time.Duration, maxResendTimes int) *Ser
 	app.stopListenSubMessageChannel = make(map[string]chan struct{})
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
 	app.maxResendTimes = maxResendTimes
+
 	app.sendBuffer = &SendBuffer{
-		sendBuffer:      make(map[string]map[*SerialChannel]map[uint32]*SendDataBuffer),
-		readySendBuffer: make(map[string]map[*SerialChannel]map[uint32]*SendDataBuffer),
-		i:               0,
+		sendBuffer:           make(map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer),
+		readySendBuffer:      make(map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer),
+		i:                    0,
+		sendFuncStopChannels: make(map[string]chan struct{}),
+		app:                  app,
 	}
 	app.Baud = Baud
 	app.ReadTimeout = ReadTimeout
@@ -80,7 +83,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	// 给下位机发送初始化验证讯号
 	for COM := range app.serialDevicesByCOM {
 		d := initSerialModuleApp.dataProcessor.ProcessSendData(COM)
-		err := app.sendToDevice(_const.InitModule, "", COM, &d)
+		err := app.sendToDevice(COM, "", 0)
 		if err != nil {
 			//TODO:err
 		}
