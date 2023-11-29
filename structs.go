@@ -27,6 +27,8 @@ type SerialDevice struct {
 type SerialApp struct {
 	// 波特率
 	Baud int
+	// 确认回报等待时间
+	ConfirmTimeout time.Duration
 	// 串口消息等待时间
 	ReadTimeout time.Duration
 	// 互斥锁
@@ -97,7 +99,7 @@ type SerialChannel struct {
 	stopSendDataChannel chan struct{}
 }
 
-// SendDataBuffer 发送数据缓存区，其中是将被发送或的数据
+// SendDataBuffer 发送数据缓存区，其中是将被发送的数据
 type SendDataBuffer struct {
 	// 数据
 	data *[]byte
@@ -119,6 +121,30 @@ type SendBuffer struct {
 	i uint32
 	// 发送线程的停止管道 COM->chan
 	sendFuncStopChannels map[string]chan struct{}
+	// App
+	app *SerialApp
+}
+
+// RevDataBuffer 接收数据缓存区，其中是将被接收的数据
+type RevDataBuffer struct {
+	// 数据
+	data *[]byte
+	// 预备被接收的数据帧编号
+	frameID uint32
+	// 该数据报编号
+	bufferID uint32
+	// 总数据帧量
+	frameNum uint32
+	// 创建时间
+	startTimeMicro int64
+}
+
+// RevBuffer 发送缓冲器
+type RevBuffer struct {
+	// 接收总缓冲区，每个COM口一个接收缓存区,这里存储了要通过这个COM口接收的数据。COM->SerialChannel->bufferID->*DataBuffer
+	revBuffer map[string]*map[*SerialChannel]*map[uint32]*RevDataBuffer
+	// 接收线程的停止管道 COM->chan
+	revFuncStopChannels map[string]chan struct{}
 	// App
 	app *SerialApp
 }

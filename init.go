@@ -12,7 +12,7 @@ import serial_ "github.com/tarm/serial"
 // InitSerialApp 初始化SerialApp
 // 传入：COM口，波特率，超时时间
 // 传出：未启动的串口
-func InitSerialApp(Baud int, ReadTimeout time.Duration, maxResendTimes int) *SerialApp {
+func InitSerialApp(baud int, readTimeout time.Duration, maxResendTimes int, confirmTimeout time.Duration) *SerialApp {
 	app := new(SerialApp)
 	app.mu = new(sync.Mutex)
 	app.isAlive = false
@@ -22,7 +22,9 @@ func InitSerialApp(Baud int, ReadTimeout time.Duration, maxResendTimes int) *Ser
 	app.stopListenSubMessageChannel = make(map[string]chan struct{})
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
 	app.maxResendTimes = maxResendTimes
-
+	app.ConfirmTimeout = confirmTimeout
+	app.Baud = baud
+	app.ReadTimeout = readTimeout
 	app.sendBuffer = &SendBuffer{
 		sendBuffer:           make(map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer),
 		readySendBuffer:      make(map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer),
@@ -30,8 +32,6 @@ func InitSerialApp(Baud int, ReadTimeout time.Duration, maxResendTimes int) *Ser
 		sendFuncStopChannels: make(map[string]chan struct{}),
 		app:                  app,
 	}
-	app.Baud = Baud
-	app.ReadTimeout = ReadTimeout
 	return app
 }
 
@@ -83,7 +83,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	// 给下位机发送初始化验证讯号
 	for COM := range app.serialDevicesByCOM {
 		d := initSerialModuleApp.dataProcessor.ProcessSendData(COM)
-		err := app.sendToDevice(COM, "", 0)
+		err := app.sendToDevice(COM, &d, 0)
 		if err != nil {
 			//TODO:err
 		}
@@ -147,8 +147,7 @@ func (processor *InitSerialDataProcessor) ProcessReadData(data []byte) {
 	processor.rightDevices = append(processor.rightDevices, COM)
 }
 
-// ProcessSendData 把数据转为byte[]
-// 将字符串转为bytes
+// ProcessSendData 把字符串转为[]byte
 func (processor *InitSerialDataProcessor) ProcessSendData(data interface{}) []byte {
 	data_ := ""
 	data_ = data.(string)

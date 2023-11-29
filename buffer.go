@@ -17,7 +17,7 @@ func (sendDataBuffer *SendDataBuffer) nextDataFrame() (err error, frameID uint32
 		return errors.New(""), 0, nil
 	}
 	defer func() { sendDataBuffer.bufferID++ }()
-	re := (*sendDataBuffer.data)[sendDataBuffer.frameID*(_const.PortLen-13) : (sendDataBuffer.bufferID+1)*(_const.PortLen-13)]
+	re := (*sendDataBuffer.data)[sendDataBuffer.frameID*(_const.PortLen-17) : (sendDataBuffer.bufferID+1)*(_const.PortLen-17)]
 	return nil, sendDataBuffer.frameID, &re
 }
 
@@ -108,7 +108,7 @@ func (sendBuffer *SendBuffer) StartSendChannel(COM string) error {
 }
 
 /*
- 数据的格式是 数据报编号[32位] 数据报帧号[32位] 数据报实际长度[32位]  数据[] 奇校验码[8位] 一帧总长度是固定的
+ 数据的格式是 数据报编号[32位] 数据报帧号[32位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少)  数据[] 奇校验码[8位] 一帧总长度是固定的
 */
 // 发送线程，这个线程会轮转式的，向下位机发送被注册的，需要发送的数据报
 // 传入：COM
@@ -131,6 +131,7 @@ func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
 					}
 					// 加入
 					*frame = append(PortLen_, *frame...)
+					*frame = append(Uint32ToBytes((*send).frameNum), *frame...)
 					*frame = append(Uint32ToBytes(frameID), *frame...)
 					*frame = append(Uint32ToBytes((*send).bufferID), *frame...)
 					*frame = append(*frame, CalculateOddParity(frame))

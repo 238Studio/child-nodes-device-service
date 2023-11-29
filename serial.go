@@ -2,6 +2,7 @@ package device
 
 import (
 	"errors"
+	"time"
 
 	_const "github.com/238Studio/child-nodes-assist/const"
 	"github.com/238Studio/child-nodes-assist/util"
@@ -97,12 +98,26 @@ func (app *SerialApp) sendToDevice(COM string, data *[]byte, times int) error {
 		return err
 		//todo
 	}
-	// 等待串口返回确认数据报
-	_, err_ := device.portIO.Read(buffer0)
-	if err_ != nil {
-		return err
-		//todo
+	// 等待串口返回确认数据报 超时则报错
+	// 是否收到
+	isRev := false
+	isReading := true
+	go func() {
+		time.Sleep(app.ConfirmTimeout)
+		if !isRev {
+			err = util.NewError(_const.CommonException, _const.Device, errors.New("SerialTimeOut"))
+			// 中断读取
+			isReading = false
+		}
+	}()
+	for isReading {
+		_, err_ := device.portIO.Read(buffer0)
+		if err_ != nil {
+			return err
+			//todo
+		}
 	}
+	isRev = true
 	if BytesToUint32(buffer0) != _const.SuccessRev {
 		if times > app.maxResendTimes {
 			return util.NewError(_const.CommonException, _const.Device, errors.New("ResendFailedOverMaxTimes"))
@@ -112,7 +127,7 @@ func (app *SerialApp) sendToDevice(COM string, data *[]byte, times int) error {
 			return err
 		}
 	}
-	return nil
+	return err
 }
 
 // StartSendMessage 监听管道讯息 把准备发送的讯息发送到下位机
