@@ -108,13 +108,12 @@ func (sendBuffer *SendBuffer) StartSendChannel(COM string) error {
 }
 
 /*
- 数据的格式是 数据报编号[32位] 数据报帧号[32位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少)  数据[] 奇校验码[8位] 一帧总长度是固定的
+ 数据的格式是 数据报编号[32位] 数据报帧号[32位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少 只包含有效数据的长度)  数据[] 补0 奇校验码[8位] 一帧总长度是固定的
 */
 // 发送线程，这个线程会轮转式的，向下位机发送被注册的，需要发送的数据报
 // 传入：COM
 // 传出：无
 func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
-	PortLen_ := Uint32ToBytes(_const.PortLen)
 	for {
 		select {
 		case <-stopChan:
@@ -130,10 +129,12 @@ func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
 						delete(*(*sendBuffer.sendBuffer[COM])[channel], frameID)
 					}
 					// 加入
-					*frame = append(PortLen_, *frame...)
+					*frame = append(Uint32ToBytes((uint32)(len(*frame))), *frame...)
 					*frame = append(Uint32ToBytes((*send).frameNum), *frame...)
 					*frame = append(Uint32ToBytes(frameID), *frame...)
 					*frame = append(Uint32ToBytes((*send).bufferID), *frame...)
+					zeros := make([]byte, int(_const.PortLen)-len(*frame)-1)
+					*frame = append(*frame, zeros...)
 					*frame = append(*frame, CalculateOddParity(frame))
 					err_ := sendBuffer.app.sendToDevice(COM, frame, 0)
 					if err != nil {

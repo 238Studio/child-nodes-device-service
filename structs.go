@@ -49,14 +49,6 @@ type SerialApp struct {
 	maxResendTimes int
 }
 
-// SerialDataProcessor 将原始的串口二进制数据转换成需要的对象
-type SerialDataProcessor interface {
-	// ProcessReadData 从串口里读取
-	ProcessReadData(data []byte)
-	// ProcessSendData 把数据转为byte[]
-	ProcessSendData(data interface{}) []byte
-}
-
 // InitSerialDataProcessor 初始化模块的数据转换器
 type InitSerialDataProcessor struct {
 	app          *SerialApp

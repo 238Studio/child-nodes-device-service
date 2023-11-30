@@ -107,6 +107,7 @@ func (app *SerialApp) sendToDevice(COM string, data *[]byte, times int) error {
 		if !isRev {
 			err = util.NewError(_const.CommonException, _const.Device, errors.New("SerialTimeOut"))
 			// 中断读取
+			//todo : 是否是堵塞的
 			isReading = false
 		}
 	}()
@@ -164,23 +165,9 @@ func (app *SerialApp) StopAllListenMessage() {
 	}
 }
 
-// StartListenMessage 开始监听指定的下位机传入数据
-// 传入：COM
-// 传出：无
-func (app *SerialApp) StartListenMessage(COM string) {
-	go func() {
-		err := app.ListenMessagePerDevice(COM)
-		if err != nil {
-			//TODO:err
-		}
-	}()
-	//如果失败则向上抛出错误
-}
-
 // StartAllListenMessage 监听下位机传入数据 把下位机内的数据传递到指定模块
 // 传入：无
 // 传出：无
-// TODO:有待讨论的
 func (app *SerialApp) StartAllListenMessage() *[]error {
 	errs := make([]error, 0)
 	for COM, _ := range app.serialDevicesByCOM {
@@ -200,5 +187,38 @@ func (app *SerialApp) StartAllListenMessage() *[]error {
 // 传入：下位机COM口
 // 传出：无
 func (app *SerialApp) ListenMessagePerDevice(COM string) error {
+	// 从串口读取的缓存
+	listenBuffer := make([]byte, _const.PortLen)
+	// 一个数据报在之前读取的数据的有效长度
+	lastRead := 0
+	// 之前读取的数据
+	lastBuffer := make([]byte, _const.PortLen)
+	// 每次读取都是把上次读取的长度和这次读取的加起来 直到达到portLen
+	for {
+		select {
+		case <-app.stopListenSubMessageChannel[COM]:
+			break
+		default:
+			read, err := app.serialDevicesByCOM[COM].portIO.Read(listenBuffer)
+			if read > 0 {
+				lastRead = read
+				if err != nil {
+					return err
+					//todo:处理错误
+				}
+				// 如果加上这次读取的还是不够一个数据报的长度 则继续读取
+				if lastRead+read < int(_const.PortLen) {
+					lastRead += read
+					lastBuffer = append(lastBuffer[:lastRead], listenBuffer[:read]...)
+					// 如果刚好是一个数据报
+				} else if lastRead+read == int(_const.PortLen) {
+					app.serialChannelByNodeModulesID
+					// 如果超过了一个数据报
+				} else {
 
+				}
+			}
+
+		}
+	}
 }
