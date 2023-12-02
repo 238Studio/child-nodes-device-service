@@ -12,15 +12,21 @@ import serial_ "github.com/tarm/serial"
 // InitSerialApp 初始化SerialApp
 // 传入：COM口，波特率，超时时间
 // 传出：未启动的串口
-func InitSerialApp(baud int, readTimeout time.Duration, maxResendTimes int, confirmTimeout time.Duration) *SerialApp {
+func InitSerialApp(baud int, readTimeout time.Duration, maxResendTimes int, confirmTimeout time.Duration, BufferWaitTimeOut int64) *SerialApp {
 	app := new(SerialApp)
 	app.mu = new(sync.Mutex)
 	app.isAlive = false
+	app.BufferWaitTimeOut = BufferWaitTimeOut
 	app.serialDevicesByCOM = make(map[string]*SerialDevice)
-	app.serialDevicesBySubModuleID = make(map[uint32]map[string]*SerialDevice)
-	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel, 1)
-	app.stopListenSubMessageChannel = make(map[string]chan struct{})
+	app.serialDevicesBySubModuleID = make(map[uint32]*map[string]*SerialDevice)
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
+	app.revBuffer = &RevBuffer{
+		revBuffer:              make(map[string]*map[uint32]*[]*[]byte),
+		revFuncStopChannels:    make(map[string]chan struct{}),
+		revBufferHangingPeriod: make(map[string]*map[uint32]int64),
+		revBufferResidue:       map[string]*map[uint32]uint32{},
+		app:                    app,
+	}
 	app.maxResendTimes = maxResendTimes
 	app.ConfirmTimeout = confirmTimeout
 	app.Baud = baud
@@ -79,7 +85,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	initSerialModuleApp.dataProcessor = new(InitSerialDataProcessor)
 	initSerialModuleApp.dataProcessor.app = app
 	initSerialModuleApp.dataProcessor.rightDevices = make([]string, 0)
-	initSerialModuleApp.serialDevicesBySubModuleID = make(map[byte]map[string]*SerialDevice)
+	initSerialModuleApp.serialDevicesBySubModuleID = make(map[byte]*map[string]*SerialDevice)
 	// 给下位机发送初始化验证讯号
 	for COM := range app.serialDevicesByCOM {
 		d := initSerialModuleApp.dataProcessor.ProcessSendData(COM)
@@ -140,17 +146,39 @@ func (processor *InitSerialDataProcessor) ProcessReadData(data []byte) {
 		module := BytesToUint32(data[6+i*4 : 10+i*4])
 		_, ok := processor.app.serialDevicesBySubModuleID[module]
 		if !ok {
-			processor.app.serialDevicesBySubModuleID[module] = make(map[string]*SerialDevice)
+			k := make(map[string]*SerialDevice)
+			processor.app.serialDevicesBySubModuleID[module] = &k
 		}
-		processor.app.serialDevicesBySubModuleID[module][COM] = processor.app.serialDevicesByCOM[COM]
+		(*processor.app.serialDevicesBySubModuleID[module])[COM] = processor.app.serialDevicesByCOM[COM]
 	}
 	processor.rightDevices = append(processor.rightDevices, COM)
 }
 
 // ProcessSendData 把字符串转为[]byte
+// 传入：数据
+// 传出：字符串
 func (processor *InitSerialDataProcessor) ProcessSendData(data interface{}) []byte {
 	data_ := ""
 	data_ = data.(string)
 	data__ := []byte(data_)
 	return data__
+}
+
+// InitRevDataBuffer 根据数据报初始化RevDataBuffer
+// 传入：一个数据报
+// 传出：*RevDataBuffer
+func InitRevDataBuffer(data *[]byte) *RevDataBuffer {
+	rev := new(RevDataBuffer)
+	frameID := BytesToUint32((*data)[0:4])
+	bufferID := BytesToUint32((*data)[4:8])
+	frameNum := BytesToUint32((*data)[8:12])
+	exactLength := BytesToUint32((*data)[12:16])
+	rev.frameID = frameID
+	rev.bufferID = bufferID
+	rev.frameNum = frameNum
+	var d []byte
+	//深拷贝
+	copy(d, (*data)[16:16+exactLength])
+	rev.data = &d
+	return rev
 }

@@ -27,6 +27,8 @@ type SerialDevice struct {
 type SerialApp struct {
 	// 波特率
 	Baud int
+	// 最大buffer等待时间 毫秒
+	BufferWaitTimeOut int64
 	// 确认回报等待时间
 	ConfirmTimeout time.Duration
 	// 串口消息等待时间
@@ -34,19 +36,18 @@ type SerialApp struct {
 	// 互斥锁
 	mu *sync.Mutex
 	// 从下位机的模块对应了若干个下位机的串口收发模块 NodeModuleID->SerialAppPerDevice
-	serialDevicesBySubModuleID map[uint32]map[string]*SerialDevice
+	serialDevicesBySubModuleID map[uint32]*map[string]*SerialDevice
 	// COM->SerialAppPerDevice
 	serialDevicesByCOM map[string]*SerialDevice
-	// 从子节点功能模块对应到SerialChannel
-	serialChannelByNodeModulesID map[uint32]*SerialChannel
-	// 中止接收下位机传来信息的通道 COM->channel
-	stopListenSubMessageChannel map[string]chan struct{}
 	// 是否运行
 	isAlive bool
 	// 发送缓存
 	sendBuffer *SendBuffer
+	// 接收缓存
+	revBuffer *RevBuffer
 	// 最大发送尝试次数
-	maxResendTimes int
+	maxResendTimes               int
+	serialChannelByNodeModulesID map[uint32]*SerialChannel
 }
 
 // InitSerialDataProcessor 初始化模块的数据转换器
@@ -62,7 +63,7 @@ type InitSerialModuleApp struct {
 	// 消息通道
 	channel *SerialChannel
 	// 从下位机的功能模块对应了若干个下位机的串口收发模块 NodeModuleID->SerialAppPerDevice
-	serialDevicesBySubModuleID map[byte]map[string]*SerialDevice
+	serialDevicesBySubModuleID map[byte]*map[string]*SerialDevice
 }
 
 // SerialMessage 串口讯息
@@ -127,14 +128,16 @@ type RevDataBuffer struct {
 	bufferID uint32
 	// 总数据帧量
 	frameNum uint32
-	// 创建时间
-	startTimeMicro int64
 }
 
 // RevBuffer 发送缓冲器
 type RevBuffer struct {
-	// 接收总缓冲区，每个COM口一个接收缓存区,这里存储了要通过这个COM口接收的数据。COM->SerialChannel->bufferID->*DataBuffer
-	revBuffer map[string]*map[*SerialChannel]*map[uint32]*RevDataBuffer
+	// 接收总缓冲区，每个COM口一个接收缓存区,这里存储了要通过这个COM口接收的数据。COM->bufferID->*byte[]
+	revBuffer map[string]*map[uint32]*[]*[]byte
+	// 接收数据空置时间 也就是某个buffer有多久没有frame 单位是毫秒 COM->bufferID->time mil
+	revBufferHangingPeriod map[string]*map[uint32]int64
+	// 接收数据剩余计数器 也就是某个bufferID的数据还有多少没收到 COM->bufferID->剩余帧数
+	revBufferResidue map[string]*map[uint32]uint32
 	// 接收线程的停止管道 COM->chan
 	revFuncStopChannels map[string]chan struct{}
 	// App

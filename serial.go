@@ -8,6 +8,13 @@ import (
 	"github.com/238Studio/child-nodes-assist/util"
 )
 
+// ParseDataToSerialMessage 将纯数据转为数据
+// 传入：*byte[]
+// 传出：*SerialMessage
+func ParseDataToSerialMessage(data *[]byte) *SerialMessage {
+	//todo
+}
+
 // CalculateOddParity 获得奇校验数
 // 传入：数据
 // 传出：奇校验数
@@ -65,8 +72,8 @@ func (app *SerialApp) send(channel *SerialChannel, targetModuleID uint32, target
 		return util.NewError(_const.CommonException, _const.Device, errors.New("map key not exist"))
 	}
 	// 没有对应模块 则直接返回 且向上层抛出错误
-	for device_ := range devices {
-		device := devices[device_]
+	for device_ := range *devices {
+		device := (*devices)[device_]
 		app.readyToSendToDevice(channel, targetModuleID, targetFunction, device.COM, data)
 	}
 
@@ -88,9 +95,9 @@ func (app *SerialApp) readyToSendToDevice(channel *SerialChannel, targetModuleID
 // 发送数据给下位机
 // 传入：COM口，数据，尝试次数
 // 传出：无
-var buffer0 []byte = make([]byte, 4)
 
 func (app *SerialApp) sendToDevice(COM string, data *[]byte, times int) error {
+	var buffer0 []byte = make([]byte, 4)
 	device := app.serialDevicesByCOM[COM]
 	// 向串口写入
 	_, err := device.portIO.Write(*data)
@@ -153,7 +160,7 @@ func (serialChannel *SerialChannel) StartSendMessage() {
 // 传入：COM
 // 传出：无
 func (app *SerialApp) StopListenMessage(COM string) {
-	app.stopListenSubMessageChannel[COM] <- struct{}{}
+	app.revBuffer.revFuncStopChannels[COM] <- struct{}{}
 }
 
 // StopAllListenMessage 终止对所有下位机的传入数据的监听
@@ -173,7 +180,7 @@ func (app *SerialApp) StartAllListenMessage() *[]error {
 	for COM, _ := range app.serialDevicesByCOM {
 		COM := COM
 		go func() {
-			err := app.ListenMessagePerDevice(COM)
+			err := app.ListenMessagePerDevice(COM, time.Now().UnixMilli())
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -184,9 +191,10 @@ func (app *SerialApp) StartAllListenMessage() *[]error {
 }
 
 // ListenMessagePerDevice 监听单个下位机传入的原始讯息 并在分析后传递到指定模块
-// 传入：下位机COM口
+// 同时 其会每隔一段时间就清除过期的buffer 为了避免线程安全问题 这两个功能被放在一个线程以内
+// 传入：下位机COM口，上一次清理buffer时间
 // 传出：无
-func (app *SerialApp) ListenMessagePerDevice(COM string) error {
+func (app *SerialApp) ListenMessagePerDevice(COM string, lastCleanBufferTime int64) error {
 	// 从串口读取的缓存
 	listenBuffer := make([]byte, _const.PortLen)
 	// 一个数据报在之前读取的数据的有效长度
@@ -196,9 +204,12 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 	// 每次读取都是把上次读取的长度和这次读取的加起来 直到达到portLen
 	for {
 		select {
-		case <-app.stopListenSubMessageChannel[COM]:
+		case <-app.revBuffer.revFuncStopChannels[COM]:
 			break
 		default:
+			// 清理超时buffer
+
+			// 读取数据
 			read, err := app.serialDevicesByCOM[COM].portIO.Read(listenBuffer)
 			if read > 0 {
 				lastRead = read
@@ -212,13 +223,21 @@ func (app *SerialApp) ListenMessagePerDevice(COM string) error {
 					lastBuffer = append(lastBuffer[:lastRead], listenBuffer[:read]...)
 					// 如果刚好是一个数据报
 				} else if lastRead+read == int(_const.PortLen) {
-					app.serialChannelByNodeModulesID
-					// 如果超过了一个数据报
+					// 将该数据呈递给缓冲区
+					dataBuffer := append(lastBuffer[:lastRead], listenBuffer[:read]...)
+					lastRead = 0
+					lastBuffer = make([]byte, _const.PortLen)
+					data := InitRevDataBuffer(&dataBuffer)
+					app.revBuffer.submitDataFrame(COM, data)
 				} else {
-
+					// 截断数据 然后提交给缓冲区
+					dataBuffer := append(lastBuffer[:lastRead], listenBuffer[:(int)(_const.PortLen)-lastRead]...)
+					lastBuffer = append(listenBuffer[((int)(_const.PortLen) - lastRead):read])
+					lastRead = (int)(_const.PortLen) - lastRead
+					data := InitRevDataBuffer(&dataBuffer)
+					app.revBuffer.submitDataFrame(COM, data)
 				}
 			}
-
 		}
 	}
 }

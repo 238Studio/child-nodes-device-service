@@ -51,9 +51,10 @@ func (app *SerialApp) RegisterSubModulesWithDevice(moduleID []uint32, COM string
 	for moduleID_ := range moduleID {
 		_, ok := app.serialDevicesBySubModuleID[moduleID[moduleID_]]
 		if !ok {
-			app.serialDevicesBySubModuleID[moduleID[moduleID_]] = make(map[string]*SerialDevice)
+			k := make(map[string]*SerialDevice)
+			app.serialDevicesBySubModuleID[moduleID[moduleID_]] = &k
 		}
-		app.serialDevicesBySubModuleID[moduleID[moduleID_]][COM] = app.serialDevicesByCOM[COM]
+		(*app.serialDevicesBySubModuleID[moduleID[moduleID_]])[COM] = app.serialDevicesByCOM[COM]
 	}
 }
 
@@ -62,9 +63,9 @@ func (app *SerialApp) RegisterSubModulesWithDevice(moduleID []uint32, COM string
 // 传出：无
 func (app *SerialApp) DeregisterSubModulesWithDevice(COM string) {
 	for device := range app.serialDevicesBySubModuleID {
-		_, ok := app.serialDevicesBySubModuleID[device][COM]
+		_, ok := (*app.serialDevicesBySubModuleID[device])[COM]
 		if ok {
-			delete(app.serialDevicesBySubModuleID[device], COM)
+			delete(*app.serialDevicesBySubModuleID[device], COM)
 		}
 	}
 }

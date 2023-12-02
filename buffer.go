@@ -4,6 +4,7 @@ import (
 	"errors"
 	_const "github.com/238Studio/child-nodes-assist/const"
 	"github.com/238Studio/child-nodes-assist/util"
+	"time"
 
 	"math"
 )
@@ -122,21 +123,28 @@ func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
 			// 执行轮转发送数据片的任务 e
 			for channel, v := range *sendBuffer.readySendBuffer[COM] {
 				for _, send := range *v {
+					//todo:切片问题
 					err, frameID, frame := (*send).nextDataFrame()
 					//发送完毕后清理缓存
 					if err != nil {
 						delete(*v, frameID)
 						delete(*(*sendBuffer.sendBuffer[COM])[channel], frameID)
 					}
-					// 加入
-					*frame = append(Uint32ToBytes((uint32)(len(*frame))), *frame...)
-					*frame = append(Uint32ToBytes((*send).frameNum), *frame...)
-					*frame = append(Uint32ToBytes(frameID), *frame...)
-					*frame = append(Uint32ToBytes((*send).bufferID), *frame...)
+					sendFrame := make([]byte, 0)
+					// 将数据的各个段的内容加入
+					// 加入实际数据长度
+					sendFrame = append(Uint32ToBytes((uint32)(len(*frame))), *frame...)
+					// 加入总帧数
+					sendFrame = append(Uint32ToBytes((*send).frameNum), sendFrame...)
+					// 加入帧ID
+					sendFrame = append(Uint32ToBytes(frameID), sendFrame...)
+					// 加入缓冲ID
+					sendFrame = append(Uint32ToBytes((*send).bufferID), sendFrame...)
+					// 补零
 					zeros := make([]byte, int(_const.PortLen)-len(*frame)-1)
-					*frame = append(*frame, zeros...)
-					*frame = append(*frame, CalculateOddParity(frame))
-					err_ := sendBuffer.app.sendToDevice(COM, frame, 0)
+					sendFrame = append(sendFrame, zeros...)
+					sendFrame = append(sendFrame, CalculateOddParity(&sendFrame))
+					err_ := sendBuffer.app.sendToDevice(COM, &sendFrame, 0)
 					if err != nil {
 						//todo:err
 						println(err_)
@@ -147,10 +155,48 @@ func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
 	}
 }
 
-// StopSendChannel 取消一个发送线程 通过COM
+// StopSendChannel 取消一个COM的发送线程 通过COM
 // 传入：无
 // 传出：无
 func (sendBuffer *SendBuffer) StopSendChannel(COM string) {
 	sendBuffer.sendFuncStopChannels[COM] <- struct{}{}
 	delete(sendBuffer.sendFuncStopChannels, COM)
+}
+
+// 呈递数据片段 将刚刚接收到的数据片段呈递给缓冲区 缓冲区会放入数据片段并判断是否可以返回数据片段
+// 传入：数据帧
+// 传出：无
+func (revBuffer *RevBuffer) submitDataFrame(COM string, buffer *RevDataBuffer) {
+	data, ok := (*(revBuffer.revBuffer[COM]))[buffer.bufferID]
+	// 如果是新的buffer
+	if !ok {
+		d := make([]*[]byte, buffer.frameNum)
+		// 分配空间
+		(*(revBuffer.revBuffer[COM]))[buffer.bufferID] = &d
+		// 打上时间戳
+		(*(revBuffer.revBufferHangingPeriod[COM]))[buffer.bufferID] = time.Now().UnixMilli()
+		// 记录剩余帧数量
+		(*(revBuffer.revBufferResidue[COM]))[buffer.bufferID] = buffer.frameNum
+	}
+	// 放入
+	(*data)[buffer.frameID] = buffer.data
+	// 剩余的--
+	(*(revBuffer.revBufferResidue[COM]))[buffer.bufferID]--
+	if (*(revBuffer.revBufferResidue[COM]))[buffer.bufferID] == 0 {
+		//解析数据并发送到指定管道
+		rev := (*(revBuffer.revBuffer[COM]))[buffer.bufferID]
+		var revData []byte
+		for i := range *rev {
+			revData = append(revData, *(*rev)[i]...)
+		}
+		copy(revData, revData)
+		// 删除该缓存
+		delete(*(revBuffer.revBuffer[COM]), buffer.bufferID)
+		delete(*(revBuffer.revBufferResidue[COM]), buffer.bufferID)
+		delete(*(revBuffer.revBufferHangingPeriod[COM]), buffer.bufferID)
+		// 将数据发送到指定通道
+		message := ParseDataToSerialMessage(&revData)
+		channel := revBuffer.app.serialChannelByNodeModulesID[message.targetModuleID]
+		channel.receiveDataChannel <- message
+	}
 }
