@@ -88,3 +88,13 @@ func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChanne
 func (app *SerialApp) RemoveSerialChannel(nodeModuleID uint32) {
 	delete(app.serialChannelByNodeModulesID, nodeModuleID)
 }
+
+// StartAutoResend 开启自动重传
+// 传入：无
+// 传出：无
+//todo
+
+// StopAutoResend 关闭自动重传
+// 传入：无
+// 传出：无
+//todo
