@@ -27,10 +27,10 @@ type SerialDevice struct {
 type SerialApp struct {
 	// 波特率
 	Baud int
-	// 最大buffer等待时间 毫秒
-	BufferWaitTimeOut int64
-	// 确认回报等待时间
-	ConfirmTimeout time.Duration
+	// 最大发送buffer等待时间 毫秒
+	SendBufferWaitTimeOut int64
+	// 最大发送消息等待时间
+	RevBufferWaitTimeOut int64
 	// 串口消息等待时间
 	ReadTimeout time.Duration
 	// 互斥锁
@@ -46,8 +46,11 @@ type SerialApp struct {
 	// 接收缓存
 	revBuffer *RevBuffer
 	// 最大发送尝试次数
-	maxResendTimes               int
+	maxResendTimes int
+	// 消息通道 通过子节点moduleID映射到
 	serialChannelByNodeModulesID map[uint32]*SerialChannel
+	// 数据报反馈通道 也就是发送给下位机消息的通道 主要用于返回错误
+	frameFeedbackChannel *SerialChannel
 }
 
 // InitSerialDataProcessor 初始化模块的数据转换器
@@ -76,14 +79,12 @@ type SerialMessage struct {
 	targetModuleID uint32
 	// 目标模块功能
 	targetFunction string
-	// 数据
+	// 数据 注意 是一个完整的数据报
 	data []byte
 }
 
-// SerialChannel 和串口进行交互的对象
+// SerialChannel 和串口进行交互的对象 每个模块最多有一个
 type SerialChannel struct {
-	// 串口应用
-	app *SerialApp
 	// 模块从下位机收到数据的通道
 	receiveDataChannel chan *SerialMessage
 	// 模块发送讯息到下位机
@@ -108,10 +109,14 @@ type SendDataBuffer struct {
 type SendBuffer struct {
 	// 发送总缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->SerialChannel->bufferID->*DataBuffer
 	sendBuffer map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer
-	// 预备发送缓冲区，这里的是正在轮换发送的数据
+	// 预备发送缓冲区，这里的是正在轮换发送的数据 COM->SerialChannel->bufferID->SendDataBuffer
 	readySendBuffer map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer
+	// 发送数据空置时间 也就是说 它在完成发送后 最后一次收到数据回报多久 超过了某个时间段就会删除 COM->SerialChannel->bufferID->*DataBuffer
+	sendBufferWaitTime map[string]*map[*SerialChannel]*map[uint32]int64
 	// 发送数据报计数器 用于唯一的标记每个数据报
 	i uint32
+	// 高优先级数据包发送计数器
+	j uint32
 	// 发送线程的停止管道 COM->chan
 	sendFuncStopChannels map[string]chan struct{}
 	// App

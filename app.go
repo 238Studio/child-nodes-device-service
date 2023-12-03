@@ -75,7 +75,6 @@ func (app *SerialApp) DeregisterSubModulesWithDevice(COM string) {
 // 传出：串口消息通道
 func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChannel {
 	channel := new(SerialChannel)
-	channel.app = app
 	channel.receiveDataChannel = make(chan *SerialMessage, 1)
 	channel.sendDataChannel = make(chan *SerialMessage, 1)
 	channel.stopSendDataChannel = make(chan struct{})

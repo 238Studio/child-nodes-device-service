@@ -12,11 +12,12 @@ import serial_ "github.com/tarm/serial"
 // InitSerialApp 初始化SerialApp
 // 传入：COM口，波特率，超时时间
 // 传出：未启动的串口
-func InitSerialApp(baud int, readTimeout time.Duration, maxResendTimes int, confirmTimeout time.Duration, BufferWaitTimeOut int64) *SerialApp {
+func InitSerialApp(baud int, readTimeout time.Duration, maxResendTimes int, RevBufferWaitTimeOut int64, SendBufferWaitTimeOut int64) *SerialApp {
 	app := new(SerialApp)
 	app.mu = new(sync.Mutex)
 	app.isAlive = false
-	app.BufferWaitTimeOut = BufferWaitTimeOut
+	app.SendBufferWaitTimeOut = SendBufferWaitTimeOut
+	app.RevBufferWaitTimeOut = RevBufferWaitTimeOut
 	app.serialDevicesByCOM = make(map[string]*SerialDevice)
 	app.serialDevicesBySubModuleID = make(map[uint32]*map[string]*SerialDevice)
 	app.serialChannelByNodeModulesID = make(map[uint32]*SerialChannel)
@@ -24,20 +25,24 @@ func InitSerialApp(baud int, readTimeout time.Duration, maxResendTimes int, conf
 		revBuffer:              make(map[string]*map[uint32]*[]*[]byte),
 		revFuncStopChannels:    make(map[string]chan struct{}),
 		revBufferHangingPeriod: make(map[string]*map[uint32]int64),
-		revBufferResidue:       map[string]*map[uint32]uint32{},
+		revBufferResidue:       make(map[string]*map[uint32]uint32),
 		app:                    app,
 	}
 	app.maxResendTimes = maxResendTimes
-	app.ConfirmTimeout = confirmTimeout
+
 	app.Baud = baud
 	app.ReadTimeout = readTimeout
 	app.sendBuffer = &SendBuffer{
 		sendBuffer:           make(map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer),
 		readySendBuffer:      make(map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer),
+		sendBufferWaitTime:   make(map[string]*map[*SerialChannel]*map[uint32]int64),
 		i:                    0,
+		j:                    0xFFF,
 		sendFuncStopChannels: make(map[string]chan struct{}),
 		app:                  app,
 	}
+	app.frameFeedbackChannel = app.GetSerialMessageChannel(0xf)
+	// todo 常量化
 	return app
 }
 
@@ -89,7 +94,7 @@ func (app *SerialApp) AutoInitAndStartApp(delayTime time.Duration) error {
 	// 给下位机发送初始化验证讯号
 	for COM := range app.serialDevicesByCOM {
 		d := initSerialModuleApp.dataProcessor.ProcessSendData(COM)
-		err := app.sendToDevice(COM, &d, 0)
+		err := app.sendToDevice(COM, &d)
 		if err != nil {
 			//TODO:err
 		}
