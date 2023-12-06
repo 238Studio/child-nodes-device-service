@@ -1,6 +1,10 @@
 package device
 
-import "github.com/tarm/serial"
+import (
+	_const "github.com/238Studio/child-nodes-assist/const"
+	"github.com/tarm/serial"
+	"time"
+)
 
 // PutDeviceIntoSerialApp 将一个下位机注册到串口应用中 实现从COM口到串口设备的映射
 // 传入：下位机
@@ -75,9 +79,12 @@ func (app *SerialApp) DeregisterSubModulesWithDevice(COM string) {
 // 传出：串口消息通道
 func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChannel {
 	channel := new(SerialChannel)
-	channel.receiveDataChannel = make(chan *SerialMessage, 1)
-	channel.sendDataChannel = make(chan *SerialMessage, 1)
-	channel.stopSendDataChannel = make(chan struct{})
+	c0 := make(chan *SerialMessage, 1)
+	channel.receiveDataChannel = &c0
+	c1 := make(chan *SerialMessage, 1)
+	channel.sendDataChannel = &c1
+	c2 := make(chan struct{})
+	channel.stopSendDataChannel = &c2
 	app.serialChannelByNodeModulesID[nodeModuleID] = channel
 	return channel
 }
@@ -92,9 +99,51 @@ func (app *SerialApp) RemoveSerialChannel(nodeModuleID uint32) {
 // StartAutoResend 开启自动重传
 // 传入：无
 // 传出：无
-//todo
+func (app *SerialApp) StartAutoResend() {
+	app.GetSerialMessageChannel(_const.FeedbackModule)
+	go app.resend()
+}
 
 // StopAutoResend 关闭自动重传
 // 传入：无
 // 传出：无
-//todo
+func (app *SerialApp) StopAutoResend() {
+	app.StopSendMessage(_const.FeedbackModule)
+
+}
+
+// 重发数据
+// 传入：无
+// 传出：无
+func (app *SerialApp) resend() {
+	for {
+		select {
+		case <-*app.frameFeedbackChannel.stopSendDataChannel:
+			break
+		case msg := <-*app.frameFeedbackChannel.receiveDataChannel:
+			// 接收到下位机重发的数据
+			COM_ := msg.data[8]
+			COM := "COM" + string(COM_)
+			bufferID := BytesToUint32(msg.data[:4])
+			frameID := BytesToUint32(msg.data[4:8])
+			if msg.targetFunction == _const.ReSendData {
+				reData := msg.data[9:]
+				// 载入数据并更新销毁时间戳
+				(*app.revBuffer.revBufferResidue[COM])[bufferID]--
+				(*app.revBuffer.revBufferHangingPeriod[COM])[bufferID] = time.Now().UnixMilli()
+				(*(*app.revBuffer.revBuffer[COM])[bufferID])[frameID] = &reData
+				continue
+			}
+			//收到下位机的重发通知
+			resendFrame := (*app.sendBuffer.readySendBuffer[COM])[bufferID]
+			d := *resendFrame.getFrame(frameID)
+			d = append(Uint32ToBytes(frameID), d...)
+			d = append(Uint32ToBytes(bufferID), d...)
+			*app.frameFeedbackChannel.sendDataChannel <- &SerialMessage{
+				targetModuleID: _const.FeedbackModule,
+				targetFunction: _const.ReSendData,
+				data:           d,
+			}
+		}
+	}
+}

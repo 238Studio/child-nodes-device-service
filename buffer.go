@@ -17,8 +17,16 @@ func (sendDataBuffer *SendDataBuffer) nextDataFrame() (err error, frameID uint32
 		return errors.New(""), 0, nil
 	}
 	defer func() { sendDataBuffer.bufferID++ }()
-	re := (*sendDataBuffer.data)[sendDataBuffer.frameID*(_const.PortLen-17) : (sendDataBuffer.bufferID+1)*(_const.PortLen-17)]
+	re := (*sendDataBuffer.data)[sendDataBuffer.frameID*(_const.PortLen-17) : (sendDataBuffer.frameID+1)*(_const.PortLen-17)]
 	return nil, sendDataBuffer.frameID, &re
+}
+
+// 获取某个数据帧的数据
+// 传入：数据帧号
+// 传出：数据
+func (sendDataBuffer *SendDataBuffer) getFrame(frameID uint32) *[]byte {
+	re := (*sendDataBuffer.data)[frameID*(_const.PortLen-17) : (sendDataBuffer.frameID+1)*(_const.PortLen-17)]
+	return &re
 }
 
 // ReadySend 开始发送指定缓存数据块的数据
@@ -27,15 +35,10 @@ func (sendDataBuffer *SendDataBuffer) nextDataFrame() (err error, frameID uint32
 func (sendBuffer *SendBuffer) ReadySend(COM string, channel *SerialChannel, bufferID uint32) {
 	_, ok := sendBuffer.readySendBuffer[COM]
 	if !ok {
-		m0 := make(map[*SerialChannel]*map[uint32]*SendDataBuffer)
+		m0 := make(map[uint32]*SendDataBuffer)
 		sendBuffer.readySendBuffer[COM] = &m0
 	}
-	_, ok_ := (*sendBuffer.readySendBuffer[COM])[channel]
-	if !ok_ {
-		m1 := make(map[uint32]*SendDataBuffer)
-		(*sendBuffer.readySendBuffer[COM])[channel] = &m1
-	}
-	(*(*sendBuffer.readySendBuffer[COM])[channel])[bufferID] = (*(*sendBuffer.sendBuffer[COM])[channel])[bufferID]
+	(*sendBuffer.readySendBuffer[COM])[bufferID] = (*sendBuffer.sendBuffer[COM])[bufferID]
 }
 
 // RegisterSendData 生成并注册缓冲数据块
@@ -48,7 +51,7 @@ func (sendBuffer *SendBuffer) RegisterSendData(COM string, channel *SerialChanne
 		bufferID: sendBuffer.i,
 		frameNum: uint32(math.Ceil(float64(uint32(len(*data)) / _const.PortLen))),
 	}
-	(*(*sendBuffer.sendBuffer[COM])[channel])[sendBuffer.i] = &buffer
+	(*sendBuffer.sendBuffer[COM])[sendBuffer.i] = &buffer
 	if sendBuffer.i > 0xFFE {
 		sendBuffer.i = 0
 	}
@@ -63,10 +66,9 @@ func (revBuffer *RevBuffer) submitDataFrame(COM string, buffer *RevDataBuffer) e
 	// 进行奇校验
 	if !VerifyOddParity(buffer.data) {
 		// 要求重发 bufferID frameID
-		revBuffer.app.frameFeedbackChannel.sendDataChannel <- &SerialMessage{
+		*revBuffer.app.frameFeedbackChannel.sendDataChannel <- &SerialMessage{
 			targetModuleID: 0xf,
-			//todo:常量化
-			targetFunction: "WrongOddVariation",
+			targetFunction: _const.WrongOddVariation,
 			data:           append(Uint32ToBytes(buffer.bufferID), Uint32ToBytes(buffer.frameID)...),
 		}
 	}
@@ -101,7 +103,7 @@ func (revBuffer *RevBuffer) submitDataFrame(COM string, buffer *RevDataBuffer) e
 		// 开启数据缓冲删除倒计时
 		(*revBuffer.revBufferHangingPeriod[COM])[buffer.bufferID] = time.Now().UnixMilli()
 		// 将数据发送给需要的模块
-		channel.receiveDataChannel <- message
+		*channel.receiveDataChannel <- message
 	}
 	return nil
 }

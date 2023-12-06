@@ -133,13 +133,13 @@ func (app *SerialApp) StartSendMessage(moduleID uint32) {
 	go func() {
 		for {
 			select {
-			case data := <-serialChannel.sendDataChannel:
+			case data := <-*serialChannel.sendDataChannel:
 				// 如果出错 则录入错误数据库
 				err := app.send(serialChannel, data.targetModuleID, data.targetFunction, &data.data)
 				if err != nil {
 					// todo:err
 				}
-			case <-serialChannel.stopSendDataChannel:
+			case <-*serialChannel.stopSendDataChannel:
 				break
 			}
 		}
@@ -150,7 +150,7 @@ func (app *SerialApp) StartSendMessage(moduleID uint32) {
 // 传入：moduleID
 // 传出：无
 func (app *SerialApp) StopSendMessage(moduleID uint32) {
-	app.serialChannelByNodeModulesID[moduleID].stopSendDataChannel <- struct{}{}
+	*app.serialChannelByNodeModulesID[moduleID].stopSendDataChannel <- struct{}{}
 }
 
 // StopListenMessage 终止对单个下位机的传入数据的监听
@@ -278,7 +278,7 @@ func (sendBuffer *SendBuffer) StartAllSendChannels() []error {
 // 传出：无
 func (sendBuffer *SendBuffer) StopAllSendChannels() {
 	for _, v := range sendBuffer.sendFuncStopChannels {
-		v <- struct{}{}
+		*v <- struct{}{}
 	}
 }
 
@@ -291,13 +291,13 @@ func (sendBuffer *SendBuffer) StartSendChannel(COM string) error {
 		return util.NewError(_const.TrivialException, _const.Device, errors.New("NoSuchCOM"))
 	}
 	stopChannel := make(chan struct{})
-	sendBuffer.sendFuncStopChannels[COM] = stopChannel
+	*sendBuffer.sendFuncStopChannels[COM] = stopChannel
 	go sendBuffer.sendFunc(stopChannel, COM)
 	return nil
 }
 
 /*
- 数据的格式是 数据报编号[32位] 数据报帧号[32位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少 只包含有效数据的长度)  数据[] 补0 奇校验码[8位] 一帧总长度是固定的
+ 数据的格式是 数据报编号[32位] 数据报帧号[32`位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少 只包含有效数据的长度)  数据[] 补0 奇校验码[8位] 一帧总长度是固定的
 */
 // 发送线程，这个线程会轮转式的，向下位机发送被注册的，需要发送的数据报
 // 传入：COM
@@ -310,27 +310,23 @@ func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
 		default:
 			// 执行删除超时发送的数据报的任务
 			nowTime := time.Now().UnixMilli()
-			for s, v := range *sendBuffer.sendBufferWaitTime[COM] {
-				for bufferID, lastTime := range *v {
-					if nowTime-lastTime > sendBuffer.app.SendBufferWaitTimeOut {
-						delete(*(*sendBuffer.sendBuffer[COM])[s], bufferID)
-						delete(*(*sendBuffer.sendBufferWaitTime[COM])[s], bufferID)
-						delete(*(*sendBuffer.readySendBuffer[COM])[s], bufferID)
-					}
+			for bufferID, lastTime := range *sendBuffer.sendBufferWaitTime[COM] {
+				if nowTime-lastTime > sendBuffer.app.SendBufferWaitTimeOut {
+					delete(*sendBuffer.sendBuffer[COM], bufferID)
+					delete(*sendBuffer.sendBufferWaitTime[COM], bufferID)
+					delete(*sendBuffer.readySendBuffer[COM], bufferID)
 				}
 			}
 			// 执行轮转发送数据片的任务 e
-			for _, v := range *sendBuffer.readySendBuffer[COM] {
-				for _, send := range *v {
-					// 发送数据帧
-					err, frameID, frame := (*send).nextDataFrame()
-					err = sendBuffer.app.sending(COM, send, frameID, frame)
-					if err != nil {
-						return
+			for _, send := range *sendBuffer.readySendBuffer[COM] {
+				// 发送数据帧
+				err, frameID, frame := (*send).nextDataFrame()
+				err = sendBuffer.app.sending(COM, send, frameID, frame)
+				if err != nil {
+					return
 
-					}
-					//todo:err
 				}
+				//todo:err
 			}
 		}
 	}
@@ -364,6 +360,6 @@ func (app *SerialApp) sending(COM string, send *SendDataBuffer, frameID uint32, 
 // 传入：无
 // 传出：无
 func (sendBuffer *SendBuffer) StopSendChannel(COM string) {
-	sendBuffer.sendFuncStopChannels[COM] <- struct{}{}
+	*sendBuffer.sendFuncStopChannels[COM] <- struct{}{}
 	delete(sendBuffer.sendFuncStopChannels, COM)
 }

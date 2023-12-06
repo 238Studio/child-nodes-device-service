@@ -51,6 +51,10 @@ type SerialApp struct {
 	serialChannelByNodeModulesID map[uint32]*SerialChannel
 	// 数据报反馈通道 也就是发送给下位机消息的通道 主要用于返回错误
 	frameFeedbackChannel *SerialChannel
+	// 初始化数据返回通道
+	initDeviceChannel *SerialChannel
+	// 初始化数据中止通道
+	stopInitDeviceChannel *chan struct{}
 }
 
 // InitSerialDataProcessor 初始化模块的数据转换器
@@ -86,11 +90,11 @@ type SerialMessage struct {
 // SerialChannel 和串口进行交互的对象 每个模块最多有一个
 type SerialChannel struct {
 	// 模块从下位机收到数据的通道
-	receiveDataChannel chan *SerialMessage
+	receiveDataChannel *chan *SerialMessage
 	// 模块发送讯息到下位机
-	sendDataChannel chan *SerialMessage
+	sendDataChannel *chan *SerialMessage
 	// 中止发送数据通道
-	stopSendDataChannel chan struct{}
+	stopSendDataChannel *chan struct{}
 }
 
 // SendDataBuffer 发送数据缓存区，其中是将被发送的数据
@@ -107,18 +111,18 @@ type SendDataBuffer struct {
 
 // SendBuffer 发送缓冲器
 type SendBuffer struct {
-	// 发送总缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->SerialChannel->bufferID->*DataBuffer
-	sendBuffer map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer
-	// 预备发送缓冲区，这里的是正在轮换发送的数据 COM->SerialChannel->bufferID->SendDataBuffer
-	readySendBuffer map[string]*map[*SerialChannel]*map[uint32]*SendDataBuffer
-	// 发送数据空置时间 也就是说 它在完成发送后 最后一次收到数据回报多久 超过了某个时间段就会删除 COM->SerialChannel->bufferID->*DataBuffer
-	sendBufferWaitTime map[string]*map[*SerialChannel]*map[uint32]int64
+	// 发送总缓冲区，每个COM口一个发送缓存区,这里存储了要通过这个COM口发送的数据。COM->bufferID->*DataBuffer
+	sendBuffer map[string]*map[uint32]*SendDataBuffer
+	// 预备发送缓冲区，这里的是正在轮换发送的数据 COM->bufferID->SendDataBuffer
+	readySendBuffer map[string]*map[uint32]*SendDataBuffer
+	// 发送数据空置时间 也就是说 它在完成发送后 最后一次收到数据回报多久 超过了某个时间段就会删除 COM->bufferID->*DataBuffer
+	sendBufferWaitTime map[string]*map[uint32]int64
 	// 发送数据报计数器 用于唯一的标记每个数据报
 	i uint32
 	// 高优先级数据包发送计数器
 	j uint32
 	// 发送线程的停止管道 COM->chan
-	sendFuncStopChannels map[string]chan struct{}
+	sendFuncStopChannels map[string]*chan struct{}
 	// App
 	app *SerialApp
 }
@@ -139,7 +143,7 @@ type RevDataBuffer struct {
 type RevBuffer struct {
 	// 接收总缓冲区，每个COM口一个接收缓存区,这里存储了要通过这个COM口接收的数据。COM->bufferID->*byte[]
 	revBuffer map[string]*map[uint32]*[]*[]byte
-	// 接收数据空置时间 也就是某个buffer有多久没有frame 单位是毫秒 COM->bufferID->time mil
+	// 上一次接收数据的时间 某个buffer 单位是毫秒 COM->bufferID->time mil
 	revBufferHangingPeriod map[string]*map[uint32]int64
 	// 接收数据剩余计数器 也就是某个bufferID的数据还有多少没收到 COM->bufferID->剩余帧数
 	revBufferResidue map[string]*map[uint32]uint32
