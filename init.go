@@ -68,12 +68,12 @@ func (app *SerialApp) AutoInitAllDevices() *[]error {
 		errs = append(errs, err)
 	}
 	for _, COM := range ports {
+		println("发现串口:" + COM)
 		err := app.AutoInitPerDevice(COM)
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
-
 	return &errs
 }
 
@@ -91,15 +91,14 @@ func (app *SerialApp) AutoInitPerDevice(COM string) error {
 		Baud:        app.Baud,
 		ReadTimeout: app.ReadTimeout,
 	}
+	// 将设备加入设备列表
+	app.PutDeviceIntoSerialApp(serialDevice)
+	// 给设备发送其COM号
 	// 启动COM口
-	app.serialDevicesByCOM[COM] = serialDevice
 	err := app.OpenPort(COM)
 	if err != nil {
 		return err
 	}
-	// 将设备加入设备列表
-	app.serialDevicesByCOM[COM] = serialDevice
-	// 给设备发送其COM号
 	COM_, _ := strconv.ParseInt(COM[3:], 10, 8)
 	buffer := []byte{byte(COM_)}
 	_, err = serialDevice.portIO.Write(buffer)
@@ -119,6 +118,7 @@ func (app *SerialApp) StartAutoInit() {
 			case <-*app.stopInitDeviceChannel:
 				break
 			case msg := <-(*app.initDeviceChannel.receiveDataChannel):
+				println("收到:" + string(msg.data))
 				if msg.targetFunction == "InitData" {
 					i := 0
 					n := (len(msg.data) - 1) / 4
@@ -130,6 +130,8 @@ func (app *SerialApp) StartAutoInit() {
 					}
 					app.RegisterSubModulesWithDevice(modules, COM)
 				}
+			default:
+				continue
 			}
 		}
 	}()

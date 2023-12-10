@@ -11,6 +11,8 @@ import (
 // 传出：无
 func (app *SerialApp) PutDeviceIntoSerialApp(device *SerialDevice) {
 	app.serialDevicesByCOM[device.COM] = device
+	m := make(map[uint32]int64)
+	app.revBuffer.revBufferHangingPeriod[device.COM] = &m
 }
 
 // RemoveDeviceFromSerialApp 将一个硬件从串口设备中移除
@@ -59,6 +61,7 @@ func (app *SerialApp) RegisterSubModulesWithDevice(moduleID []uint32, COM string
 			app.serialDevicesBySubModuleID[moduleID[moduleID_]] = &k
 		}
 		(*app.serialDevicesBySubModuleID[moduleID[moduleID_]])[COM] = app.serialDevicesByCOM[COM]
+
 	}
 }
 
@@ -74,7 +77,7 @@ func (app *SerialApp) DeregisterSubModulesWithDevice(COM string) {
 	}
 }
 
-// GetSerialMessageChannel 获取并注册消息通道
+// GetSerialMessageChannel 获取并注册子节点消息通道
 // 传入：子节点模块ID
 // 传出：串口消息通道
 func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChannel {
@@ -144,6 +147,8 @@ func (app *SerialApp) resend() {
 				targetFunction: _const.ReSendData,
 				data:           d,
 			}
+		default:
+			continue
 		}
 	}
 }

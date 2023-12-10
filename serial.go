@@ -50,6 +50,7 @@ func CalculateOddParity(data *[]byte) byte {
 		return 1
 	}
 	return 0
+
 }
 
 // Uint32ToBytes uint32->bytes
@@ -141,6 +142,8 @@ func (app *SerialApp) StartSendMessage(moduleID uint32) {
 				}
 			case <-*serialChannel.stopSendDataChannel:
 				break
+			default:
+				continue
 			}
 		}
 	}()
@@ -218,7 +221,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string, lastCleanBufferTime int
 					delete(*app.revBuffer.revBufferHangingPeriod[COM], bufferID)
 				}
 			}
-			// 发送数据
+			// 读取串口
 			read, err := app.serialDevicesByCOM[COM].portIO.Read(listenBuffer)
 			if read > 0 {
 				lastRead = read
@@ -255,6 +258,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string, lastCleanBufferTime int
 					}
 				}
 			}
+			continue
 		}
 	}
 }
@@ -328,6 +332,7 @@ func (sendBuffer *SendBuffer) sendFunc(stopChan chan struct{}, COM string) {
 				}
 				//todo:err
 			}
+			continue
 		}
 	}
 }
