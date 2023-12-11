@@ -117,15 +117,15 @@ func (app *SerialApp) StartAutoInit() {
 			select {
 			case <-*app.stopInitDeviceChannel:
 				break
-			case msg := <-(*app.initDeviceChannel.receiveDataChannel):
-				println("收到:" + string(msg.data))
-				if msg.targetFunction == "InitData" {
+			case msg := <-(*app.initDeviceChannel.ReceiveDataChannel):
+				println("收到:" + string(msg.Data))
+				if msg.TargetFunction == "InitData" {
 					i := 0
-					n := (len(msg.data) - 1) / 4
+					n := (len(msg.Data) - 1) / 4
 					modules := make([]uint32, 0)
-					COM := "COM" + string(msg.data[0])
+					COM := "COM" + string(msg.Data[0])
 					for i < n {
-						modules = append(modules, BytesToUint32(msg.data[i*4+1:i*4+5]))
+						modules = append(modules, BytesToUint32(msg.Data[i*4+1:i*4+5]))
 						i++
 					}
 					app.RegisterSubModulesWithDevice(modules, COM)

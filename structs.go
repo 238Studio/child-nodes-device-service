@@ -80,19 +80,19 @@ type SerialMessage struct {
 	下位机的功能模块 比较多样且可以自定义 例如底盘驱动 云台 或者发射器等 而上位机的功能模块则只有少数几个
 	包括了 传感器反馈，错误通道，数据报告，初始化4个 也就是分别是传感器反馈的数据 底层出现软件错误汇报的错误 以及报告底层软件状态的数据报告
 	*/
-	targetModuleID uint32
+	TargetModuleID uint32
 	// 目标模块功能
-	targetFunction string
+	TargetFunction string
 	// 数据 注意 是一个完整的数据报
-	data []byte
+	Data []byte
 }
 
 // SerialChannel 和串口进行交互的对象 每个模块最多有一个
 type SerialChannel struct {
 	// 模块从下位机收到数据的通道
-	receiveDataChannel *chan *SerialMessage
+	ReceiveDataChannel *chan *SerialMessage
 	// 模块发送讯息到下位机
-	sendDataChannel *chan *SerialMessage
+	SendDataChannel *chan *SerialMessage
 	// 中止发送数据通道
 	stopSendDataChannel *chan struct{}
 }

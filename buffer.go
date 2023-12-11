@@ -66,10 +66,10 @@ func (revBuffer *RevBuffer) submitDataFrame(COM string, buffer *RevDataBuffer) e
 	// 进行奇校验
 	if !VerifyOddParity(buffer.data) {
 		// 要求重发 bufferID frameID
-		*revBuffer.app.frameFeedbackChannel.sendDataChannel <- &SerialMessage{
-			targetModuleID: 0xf,
-			targetFunction: _const.WrongOddVariation,
-			data:           append(Uint32ToBytes(buffer.bufferID), Uint32ToBytes(buffer.frameID)...),
+		*revBuffer.app.frameFeedbackChannel.SendDataChannel <- &SerialMessage{
+			TargetModuleID: _const.FeedbackModule,
+			TargetFunction: _const.WrongOddVariation,
+			Data:           append(Uint32ToBytes(buffer.bufferID), Uint32ToBytes(buffer.frameID)...),
 		}
 	}
 	data, ok := (*(revBuffer.revBuffer[COM]))[buffer.bufferID]
@@ -99,11 +99,11 @@ func (revBuffer *RevBuffer) submitDataFrame(COM string, buffer *RevDataBuffer) e
 		copy(revData, revData)
 		// 将数据发送到指定通道
 		message := ParseDataToSerialMessage(&revData)
-		channel := revBuffer.app.serialChannelByNodeModulesID[message.targetModuleID]
+		channel := revBuffer.app.serialChannelByNodeModulesID[message.TargetModuleID]
 		// 开启数据缓冲删除倒计时
 		(*revBuffer.revBufferHangingPeriod[COM])[buffer.bufferID] = time.Now().UnixMilli()
 		// 将数据发送给需要的模块
-		*channel.receiveDataChannel <- message
+		*channel.ReceiveDataChannel <- message
 	}
 	return nil
 }

@@ -134,9 +134,9 @@ func (app *SerialApp) StartSendMessage(moduleID uint32) {
 	go func() {
 		for {
 			select {
-			case data := <-*serialChannel.sendDataChannel:
+			case data := <-*serialChannel.SendDataChannel:
 				// 如果出错 则录入错误数据库
-				err := app.send(serialChannel, data.targetModuleID, data.targetFunction, &data.data)
+				err := app.send(serialChannel, data.TargetModuleID, data.TargetFunction, &data.Data)
 				if err != nil {
 					// todo:err
 				}
@@ -301,7 +301,7 @@ func (sendBuffer *SendBuffer) StartSendChannel(COM string) error {
 }
 
 /*
- 数据的格式是 数据报编号[32位] 数据报帧号[32`位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少 只包含有效数据的长度)  数据[] 补0 奇校验码[8位] 一帧总长度是固定的
+ 数据的格式是 数据报编号[32位] 数据报帧号[32位] 数据报总帧数[32位] 数据报实际长度[32位](也就是这个数据报内要截取多少 只包含有效数据的长度)  数据[] 补0 奇校验码[8位] 一帧总长度是固定的
 */
 // 发送线程，这个线程会轮转式的，向下位机发送被注册的，需要发送的数据报
 // 传入：COM

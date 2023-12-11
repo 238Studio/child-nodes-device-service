@@ -83,9 +83,9 @@ func (app *SerialApp) DeregisterSubModulesWithDevice(COM string) {
 func (app *SerialApp) GetSerialMessageChannel(nodeModuleID uint32) *SerialChannel {
 	channel := new(SerialChannel)
 	c0 := make(chan *SerialMessage, 1)
-	channel.receiveDataChannel = &c0
+	channel.ReceiveDataChannel = &c0
 	c1 := make(chan *SerialMessage, 1)
-	channel.sendDataChannel = &c1
+	channel.SendDataChannel = &c1
 	c2 := make(chan struct{})
 	channel.stopSendDataChannel = &c2
 	app.serialChannelByNodeModulesID[nodeModuleID] = channel
@@ -123,14 +123,14 @@ func (app *SerialApp) resend() {
 		select {
 		case <-*app.frameFeedbackChannel.stopSendDataChannel:
 			break
-		case msg := <-*app.frameFeedbackChannel.receiveDataChannel:
+		case msg := <-*app.frameFeedbackChannel.ReceiveDataChannel:
 			// 接收到下位机重发的数据
-			COM_ := msg.data[8]
+			COM_ := msg.Data[8]
 			COM := "COM" + string(COM_)
-			bufferID := BytesToUint32(msg.data[:4])
-			frameID := BytesToUint32(msg.data[4:8])
-			if msg.targetFunction == _const.ReSendData {
-				reData := msg.data[9:]
+			bufferID := BytesToUint32(msg.Data[:4])
+			frameID := BytesToUint32(msg.Data[4:8])
+			if msg.TargetFunction == _const.ReSendData {
+				reData := msg.Data[9:]
 				// 载入数据并更新销毁时间戳
 				(*app.revBuffer.revBufferResidue[COM])[bufferID]--
 				(*app.revBuffer.revBufferHangingPeriod[COM])[bufferID] = time.Now().UnixMilli()
@@ -142,10 +142,10 @@ func (app *SerialApp) resend() {
 			d := *resendFrame.getFrame(frameID)
 			d = append(Uint32ToBytes(frameID), d...)
 			d = append(Uint32ToBytes(bufferID), d...)
-			*app.frameFeedbackChannel.sendDataChannel <- &SerialMessage{
-				targetModuleID: _const.FeedbackModule,
-				targetFunction: _const.ReSendData,
-				data:           d,
+			*app.frameFeedbackChannel.SendDataChannel <- &SerialMessage{
+				TargetModuleID: _const.FeedbackModule,
+				TargetFunction: _const.ReSendData,
+				Data:           d,
 			}
 		default:
 			continue
