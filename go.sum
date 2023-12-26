@@ -1,9 +1,5 @@
-github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.2 h1:xwGGhrJgRFEQVxWDLZfG9vCjlj3JfRuHpp6WPBiEdOI=
-github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.2/go.mod h1:Bt1nL4+xQ5ns+fatFxE0xoiuiE5NeoAMPcraY6TxilY=
-github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.4/go.mod h1:Bt1nL4+xQ5ns+fatFxE0xoiuiE5NeoAMPcraY6TxilY=
-github.com/UniversalRobotDriveTeam/child-nodes-assist v1.0.5/go.mod h1:Bt1nL4+xQ5ns+fatFxE0xoiuiE5NeoAMPcraY6TxilY=
-github.com/UniversalRobotDriveTeam/child-nodes-basic v1.0.0 h1:Nu3VaYAi5vQY5fvw+9vJajPT1z87vxfCg+I3K0F90rs=
-github.com/UniversalRobotDriveTeam/child-nodes-basic v1.0.0/go.mod h1:hYI8mewgFSaJex7g6mERhbBwC2HgvlvuR/36rE7P7zg=
+github.com/238Studio/child-nodes-assist v1.14.0 h1:4xSyLh4lChUZAQl1Vh48DPMcwpb4761bQ1lnZkt1Xb8=
+github.com/238Studio/child-nodes-assist v1.14.0/go.mod h1:moO2jhZ3uqBflOqqhZncfQaRDsMj5Iz/vun+1uRpZ6w=
 github.com/creack/goselect v0.1.2 h1:2DNy14+JPjRBgPzAd1thbQp4BSIihxcBf0IXhQXDRa0=
 github.com/creack/goselect v0.1.2/go.mod h1:a/NhLweNvqIYMuxcMOuWY516Cimucms3DglDzQP3hKY=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
@@ -16,7 +12,7 @@ github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07 h1:UyzmZLoiDWMRywV4DUY
 github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cbyO7IOYJZWg1U88JhDg3PB6klq9Hg2pA=
 go.bug.st/serial v1.6.1 h1:VSSWmUxlj1T/YlRo2J104Zv3wJFrjHIl/T3NeruWAHY=
 go.bug.st/serial v1.6.1/go.mod h1:UABfsluHAiaNI+La2iESysd9Vetq7VRdpxvjx7CmmOE=
-golang.org/x/sys v0.12.0 h1:CM0HF96J0hcLAwsHPJZjfdNzs0gftsLfgKt57wWHJ0o=
-golang.org/x/sys v0.12.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
-gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+golang.org/x/sys v0.15.0 h1:h48lPFYpsTvQJZF4EKyI4aLHaev3CxivZmv7yZig9pc=
+golang.org/x/sys v0.15.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c h1:dUUwHk2QECo/6vqA44rthZ8ie2QXMNeKRTHCNY2nXvo=
+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
