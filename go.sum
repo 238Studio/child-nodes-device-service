@@ -1,9 +1,13 @@
-github.com/238Studio/child-nodes-assist v1.14.0 h1:4xSyLh4lChUZAQl1Vh48DPMcwpb4761bQ1lnZkt1Xb8=
-github.com/238Studio/child-nodes-assist v1.14.0/go.mod h1:moO2jhZ3uqBflOqqhZncfQaRDsMj5Iz/vun+1uRpZ6w=
+github.com/238Studio/child-nodes-assist v1.17.0 h1:KYYRceZ744sidv0MmaG+7XX4nyNCLr0g8PFebpPnO/g=
+github.com/238Studio/child-nodes-assist v1.17.0/go.mod h1:xzED3AH7uTWgFvZ1DeuO//DjgzjUvC4KIDct1dJ8Eiw=
+github.com/238Studio/child-nodes-error-manager v0.0.1 h1:BH5saKDHqdLUpqCugl3SZp7PCXs3AmNT4Uwb1s+gB+o=
+github.com/238Studio/child-nodes-error-manager v0.0.1/go.mod h1:sdH7hWskPx4rqr30G6KTu2T4sXIRTowJXSRjZJ8RlmM=
 github.com/creack/goselect v0.1.2 h1:2DNy14+JPjRBgPzAd1thbQp4BSIihxcBf0IXhQXDRa0=
 github.com/creack/goselect v0.1.2/go.mod h1:a/NhLweNvqIYMuxcMOuWY516Cimucms3DglDzQP3hKY=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=
