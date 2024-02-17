@@ -5,7 +5,7 @@ import (
 	"time"
 
 	_const "github.com/238Studio/child-nodes-assist/const"
-	"github.com/238Studio/child-nodes-assist/util"
+	"github.com/238Studio/child-nodes-error-manager/errpack"
 )
 
 // ParseDataToSerialMessage 将纯数据转为数据
@@ -88,7 +88,7 @@ func (app *SerialApp) send(channel *SerialChannel, targetModuleID uint32, target
 	defer app.mu.Unlock()
 	devices, ok := app.serialDevicesBySubModuleID[targetModuleID]
 	if !ok {
-		return util.NewError(_const.CommonException, _const.Device, errors.New("map key not exist"))
+		return errpack.NewError(errpack.CommonException, errpack.Device, errors.New("map key not exist"))
 	}
 	// 没有对应模块 则直接返回 且向上层抛出错误
 	for device_ := range *devices {
@@ -121,7 +121,7 @@ func (app *SerialApp) sendToDevice(COM string, data *[]byte) error {
 	// 向串口写入
 	_, err := device.portIO.Write(*data)
 	if err != nil {
-		return util.NewError(_const.CommonException, _const.Device, errors.New("SendFailed"))
+		return errpack.NewError(errpack.CommonException, errpack.Device, errors.New("SendFailed"))
 	}
 	return err
 }
@@ -196,11 +196,11 @@ func (app *SerialApp) StartAllListenMessage() *[]error {
 // 传出：无
 func (app *SerialApp) ListenMessagePerDevice(COM string, lastCleanBufferTime int64) error {
 	// 从串口读取的缓存
-	listenBuffer := make([]byte, _const.PortLen)
+	listenBuffer := make([]byte, portLen)
 	// 一个数据报在之前读取的数据的有效长度
 	lastRead := 0
 	// 之前读取的数据
-	lastBuffer := make([]byte, _const.PortLen)
+	lastBuffer := make([]byte, portLen)
 	// 每次读取都是把上次读取的长度和这次读取的加起来 直到达到portLen
 	for {
 		select {
@@ -230,7 +230,7 @@ func (app *SerialApp) ListenMessagePerDevice(COM string, lastCleanBufferTime int
 					//todo:处理错误
 				}
 				// 如果加上这次读取的还是不够一个数据报的长度 则继续读取
-				if lastRead+read < int(_const.PortLen) {
+				if lastRead+read < int(portLen) {
 					lastRead += read
 					lastBuffer = append(lastBuffer[:lastRead], listenBuffer[:read]...)
 					// 如果刚好是一个数据报
@@ -247,9 +247,9 @@ func (app *SerialApp) ListenMessagePerDevice(COM string, lastCleanBufferTime int
 					}
 				} else {
 					// 截断数据 然后提交给缓冲区
-					dataBuffer := append(lastBuffer[:lastRead], listenBuffer[:(int)(_const.PortLen)-lastRead]...)
-					lastBuffer = append(listenBuffer[((int)(_const.PortLen) - lastRead):read])
-					lastRead = (int)(_const.PortLen) - lastRead
+					dataBuffer := append(lastBuffer[:lastRead], listenBuffer[:(int)(portLen)-lastRead]...)
+					lastBuffer = append(listenBuffer[((int)(portLen) - lastRead):read])
+					lastRead = (int)(portLen) - lastRead
 					data := InitRevDataBuffer(&dataBuffer)
 					err := app.revBuffer.submitDataFrame(COM, data)
 					if err != nil {
@@ -292,7 +292,7 @@ func (sendBuffer *SendBuffer) StopAllSendChannels() {
 func (sendBuffer *SendBuffer) StartSendChannel(COM string) error {
 	_, ok := sendBuffer.readySendBuffer[COM]
 	if !ok {
-		return util.NewError(_const.TrivialException, _const.Device, errors.New("NoSuchCOM"))
+		return errpack.NewError(errpack.TrivialException, errpack.Device, errors.New("NoSuchCOM"))
 	}
 	stopChannel := make(chan struct{})
 	*sendBuffer.sendFuncStopChannels[COM] = stopChannel
@@ -354,7 +354,7 @@ func (app *SerialApp) sending(COM string, send *SendDataBuffer, frameID uint32, 
 	// 加入缓冲ID
 	sendFrame = append(Uint32ToBytes((*send).bufferID), sendFrame...)
 	// 补零
-	zeros := make([]byte, int(_const.PortLen)-len(*frame)-1)
+	zeros := make([]byte, int(portLen)-len(*frame)-1)
 	sendFrame = append(sendFrame, zeros...)
 	sendFrame = append(sendFrame, CalculateOddParity(&sendFrame))
 	err := app.sendToDevice(COM, &sendFrame)

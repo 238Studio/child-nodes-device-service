@@ -1,9 +1,10 @@
 package device
 
 import (
+	"time"
+
 	_const "github.com/238Studio/child-nodes-assist/const"
 	"github.com/tarm/serial"
-	"time"
 )
 
 // PutDeviceIntoSerialApp 将一个下位机注册到串口应用中 实现从COM口到串口设备的映射

@@ -2,8 +2,9 @@ package device
 
 import (
 	"errors"
-	_const "github.com/238Studio/child-nodes-assist/const"
 	"time"
+
+	_const "github.com/238Studio/child-nodes-assist/const"
 
 	"math"
 )

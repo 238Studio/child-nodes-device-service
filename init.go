@@ -1,10 +1,11 @@
 package device
 
 import (
-	_const "github.com/238Studio/child-nodes-assist/const"
 	"strconv"
 	"sync"
 	"time"
+
+	_const "github.com/238Studio/child-nodes-assist/const"
 
 	"go.bug.st/serial"
 )
